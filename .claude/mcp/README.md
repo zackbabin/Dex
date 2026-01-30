@@ -64,6 +64,12 @@ Each `.json` file in this folder connects one external system (Calendar, Granola
 - **update-checker.json** - GitHub update detection for `/dex-update` (changelog checking, version comparison)
 - **work.json** - Task management (create, update, complete tasks)
 
+## External Integrations
+
+Some integrations are **hosted externally** and don't use local config files:
+
+- **Pendo MCP** - Hosted by Pendo with OAuth. Add directly to AI client config (see onboarding Step 8 or https://support.pendo.io/hc/en-us/articles/41102236924955)
+
 ## Setup Process
 
 Use `/create-mcp` skill to:

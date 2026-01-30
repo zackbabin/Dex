@@ -359,6 +359,48 @@ This ensures every task gets a unique, sortable ID that's stable across files.
 
 If interrupted, calling `start_onboarding_session()` resumes from the last completed step.
 
+### External MCP Integrations
+
+#### Pendo (Optional for Pendo Customers)
+
+**Type:** Hosted external MCP server (not shipped with Dex)
+
+**Purpose:** Product analytics for Pendo customers - track guide performance, feature adoption, visitor/account engagement.
+
+**Setup:**
+1. Admin must enable in Pendo: Settings → Subscription Settings → AI Features → Pendo MCP Server
+2. Add to AI client config (Cursor example):
+```json
+{
+  "mcpServers": {
+    "pendo": {
+      "url": "https://app.pendo.io/mcp/v0/shttp"
+    }
+  }
+}
+```
+3. Authenticate with OAuth using Pendo login credentials
+
+**Regional URLs:**
+- US: `https://app.pendo.io/mcp/v0/shttp`
+- US1: `https://us1.app.pendo.io/mcp/v0/shttp`
+- EU: `https://app.eu.pendo.io/mcp/v0/shttp`
+- Japan: `https://app.jpn.pendo.io/mcp/v0/shttp`
+- Australia: `https://app.au.pendo.io/mcp/v0/shttp`
+
+**Available tools:**
+- Visitor and account metadata
+- Page, Feature, and Track Event analytics
+- Event-level aggregation queries
+- Activity and engagement patterns
+
+**Use cases:**
+- "What's our top performing guide this month?"
+- "Which accounts are most active in the last 30 days?"
+- "How many users adopted the new dashboard feature?"
+
+**Documentation:** https://support.pendo.io/hc/en-us/articles/41102236924955
+
 ### MCP Development Pattern
 
 All Dex MCP servers follow this pattern:

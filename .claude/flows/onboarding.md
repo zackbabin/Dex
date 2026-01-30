@@ -278,6 +278,7 @@ Say: "The core system is ready. A couple optional add-ons you can set up now or 
 
 - **Journaling** — Daily/weekly reflection prompts (2-3 min/day)
 - **Granola** — Automatic meeting processing (if you use it)
+- **Pendo** — Product analytics integration (if you're a Pendo customer)
 - **Background Learning** — Automatic checks for new Claude features and pending learnings (macOS only)
 
 Want to set up any of these now, or skip and discover them later?"
@@ -321,6 +322,55 @@ Want to set up manual or automatic processing?"
 2. Get their API key
 3. Update `System/user-profile.yaml` and `.env`
 4. Say: "✓ Automatic processing enabled. I'll sync every 30 minutes. You can still use `/getting-started` for historical data."
+
+### Pendo Setup (if selected):
+
+Ask: "Are you a Pendo customer? Pendo's MCP integration gives you:
+- Guide performance tracking (in-app messages, onboarding flows)
+- Feature adoption metrics
+- Visitor and account engagement data
+- Product usage insights
+
+**What you'll need:**
+- Pendo subscription with MCP enabled (admin must enable in Settings → Subscription Settings → AI Features)
+- Your Pendo login credentials for OAuth
+
+Want to connect Pendo now?"
+
+**If yes:**
+1. Say: "I'll guide you through adding Pendo's hosted MCP server."
+2. Ask: "Which AI client are you using? (Cursor/Claude Desktop/Claude Code/ChatGPT/Gemini CLI/Windsurf/Other)"
+3. Based on their answer, provide specific setup instructions:
+
+**For Cursor:**
+```
+1. Go to Cursor → Settings → Cursor Settings
+2. In Tools & MCP, select "+ New MCP Server"
+3. Add this configuration to your mcp.json:
+
+{
+  "mcpServers": {
+    "pendo": {
+      "url": "https://app.pendo.io/mcp/v0/shttp"
+    }
+  }
+}
+
+4. Select "Connect" and sign in with your Pendo credentials
+5. Allow Cursor to access your Pendo subscription
+```
+
+**For Claude Desktop:**
+- Admin must first add Pendo connector in Admin Settings → Connectors
+- Then users can connect via Settings → Connectors → Pendo → Connect
+
+**For other clients:** Provide the regional URL (US: `https://app.pendo.io/mcp/v0/shttp`) and OAuth instructions.
+
+4. Update `System/user-profile.yaml` with `pendo_mcp_enabled: true` to track that it's configured
+5. Say: "✓ Pendo MCP configured! Once you authenticate, you can query product analytics. Try asking about guide performance or feature adoption."
+
+**If no:**
+Say: "No problem! You can connect Pendo MCP later. Full instructions: https://support.pendo.io/hc/en-us/articles/41102236924955"
 
 ### Background Learning Setup (if selected, macOS only):
 

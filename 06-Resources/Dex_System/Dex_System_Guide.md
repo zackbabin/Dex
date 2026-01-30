@@ -865,7 +865,7 @@ Dex includes built-in MCP servers and can work with additional integrations.
 
 ### Built-in MCP Servers
 
-Dex includes six custom MCP servers in `core/mcp/`:
+Dex includes seven custom MCP servers in `core/mcp/`:
 
 | MCP Server | File | What It Does |
 |------------|------|--------------|
@@ -875,6 +875,13 @@ Dex includes six custom MCP servers in `core/mcp/`:
 | **Career** | `career_server.py` | Career development tracking, evidence aggregation, competency analysis |
 | **Resume** | `resume_server.py` | Resume building with sessions, metric validation, LinkedIn generation |
 | **Dex Improvements** | `dex_improvements_server.py` | Improvement idea capture, duplicate detection, backlog management |
+| **Update Checker** | `update_checker.py` | Automatic Dex update detection from GitHub |
+
+### Optional External Integrations
+
+| MCP Server | What It Does | Setup |
+|------------|--------------|-------|
+| **Pendo** (hosted) | Product analytics for Pendo customers - guide performance, feature adoption, engagement tracking | OAuth via Pendo. Enable in onboarding or add to AI client config. Details: https://support.pendo.io/hc/en-us/articles/41102236924955 |
 
 ### Calendar MCP Tools
 

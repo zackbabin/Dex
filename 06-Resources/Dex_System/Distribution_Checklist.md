@@ -54,6 +54,7 @@ These are user-installed separately via Claude Desktop/Cursor settings:
 
 - `cursor-ide-browser` — Browser automation
 - `user-granola` — Official Granola MCP (different from dex granola-mcp)
+- `pendo` — Pendo's hosted MCP server (OAuth, optional for Pendo customers)
 - `user-whatsapp`, `user-apify`, etc. — Other user-installed integrations
 
 ### Optional Dependencies

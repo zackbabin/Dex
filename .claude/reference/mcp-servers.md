@@ -271,7 +271,8 @@ User runs `/dex-update` → Update Checker MCP checks GitHub → finds v2.1.0 wi
 | Resume | `resume_server.py` | Built-in |
 | Onboarding | `onboarding_server.py` | Built-in |
 | Update Checker | `update_checker.py` | Built-in |
-| Pendo | Remote (hosted) | OAuth auth required |
+| Dex Improvements | `dex_improvements_server.py` | Built-in |
+| Pendo | Hosted (OAuth) | External (optional) |
 
 ### Setting Up Integrations
 
@@ -281,11 +282,14 @@ See `System/.mcp.json.example` for a complete config with all built-in servers:
 - `work_server.py` - Task management (always enabled)
 - `calendar_server.py` - Apple Calendar integration
 - `granola_server.py` - Meeting notes integration
-- `dex_improvements_server.py` - System improvement backlog
 - `career_server.py` - Career development tracking
 - `resume_server.py` - Resume building
+- `dex_improvements_server.py` - System improvement backlog
 - `onboarding_server.py` - Stateful onboarding with validation
 - `update_checker.py` - GitHub update detection
+
+**External integrations (optional):**
+- Pendo MCP - Hosted by Pendo with OAuth (https://support.pendo.io/hc/en-us/articles/41102236924955)
 
 Example config:
 
