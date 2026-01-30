@@ -88,22 +88,38 @@ fi
 
 if [ -n "$PYTHON_CMD" ]; then
     PYTHON_VERSION=$($PYTHON_CMD --version | cut -d' ' -f2)
+    PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d'.' -f1)
+    PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d'.' -f2)
+    
+    # Check if Python 3.10+
+    if [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 10 ]; then
+        echo "❌ Python $PYTHON_VERSION found (too old)"
+        echo ""
+        echo "MCP SDK requires Python 3.10 or newer."
+        echo "You have Python $PYTHON_VERSION which is too old."
+        echo ""
+        echo "Install Python 3.10+:"
+        echo "  Download the latest version from https://www.python.org/downloads/"
+        echo "  After installing, restart your terminal and run ./install.sh again"
+        exit 1
+    fi
+    
     echo "✅ Python $PYTHON_VERSION"
 else
     echo "❌ Python 3 not found"
     echo ""
-    echo "Python is required for Work MCP (task sync across all files)."
+    echo "Python 3.10+ is required for MCP servers (task sync across all files)."
     echo "Without it, tasks won't sync between meeting notes, person pages, and Tasks.md."
     echo ""
     if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
-        echo "Install Python 3.8+:"
+        echo "Install Python 3.10+:"
         echo "  1. Download from https://www.python.org/downloads/"
         echo "  2. Run the installer"
         echo "  3. ⚠️  IMPORTANT: Check 'Add Python to PATH' during installation"
         echo "  4. Restart your terminal"
         echo "  5. Run ./install.sh again"
     else
-        echo "Install Python 3.8+:"
+        echo "Install Python 3.10+:"
         echo "  Mac: Download from https://www.python.org/downloads/"
         echo "  Or use Homebrew: brew install python3"
         echo ""

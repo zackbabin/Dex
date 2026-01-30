@@ -50,12 +50,14 @@ The system teaches you as you go. Start shallow, go deep as you get curious. Two
    - **Mac:** Installs automatically when needed (you'll see a prompt)
    - **Windows:** Download from [git-scm.com/download/win](https://git-scm.com/download/win)
 3. **[Node.js](https://nodejs.org/)** - Download the "LTS" version and install (this enables the system's automation features)
-4. **[Python 3](https://www.python.org/downloads/)** - Download and install (required for task sync across all files)
+4. **[Python 3.10+](https://www.python.org/downloads/)** - Download and install (required for MCP servers and task sync)
+   - **Minimum version:** Python 3.10 or newer
    - **Windows users:** ⚠️ During installation, check the box "Add Python to PATH" - this is critical
+   - **Mac users with old Python:** If you have Python 3.9 or older, download fresh from python.org
 
 All installers walk you through setup with default options.
 
-**Why Python?** The Work MCP server (Python-based) enables task sync - when you check off a task in a meeting note, it updates everywhere automatically (person pages, project files, Tasks.md). Without Python, tasks don't sync and you manage them manually.
+**Why Python 3.10+?** The MCP SDK (Model Context Protocol) requires Python 3.10 or newer. This powers the Work MCP server that enables task sync - when you check off a task in a meeting note, it updates everywhere automatically (person pages, project files, Tasks.md).
 
 **Mac users:** If this is your first time using command-line tools, macOS will prompt you to install "Command Line Developer Tools" during setup. Click **Install** when prompted - it's safe and required. Takes 2-3 minutes.
 
@@ -103,13 +105,17 @@ python3 --version
 
 **Windows users:** Try `python --version` if `python3` doesn't work.
 
-**You should see a response like:** `Python 3.8.x` or higher (any 3.x version works)
+**You should see a response like:** `Python 3.10.x` or higher (3.11, 3.12, etc.)
+
+**If you see Python 3.9 or older:** The MCP SDK requires Python 3.10+. Download and install a newer version:
+- **Mac/Windows:** Download from [python.org](https://www.python.org/downloads/) (get the latest stable version)
+- After installing, restart your terminal and check the version again
 
 **If you see "command not found":**
 - **Windows:** Python likely isn't in your PATH. Reinstall from [python.org](https://www.python.org/downloads/) and check "Add Python to PATH" during installation. Restart your terminal after.
-- **Mac:** Download Python 3 from [python.org](https://www.python.org/downloads/), install it, then restart your terminal.
+- **Mac:** Download Python from [python.org](https://www.python.org/downloads/), install it, then restart your terminal.
 
-**Why Python matters:** It powers the Work MCP server that syncs tasks everywhere. Check off a task in a meeting note → it updates in your Tasks.md, person pages, and project files automatically. Without Python, you'll manually manage task updates across files.
+**Why Python 3.10+ matters:** It powers the MCP servers that sync tasks everywhere. Check off a task in a meeting note → it updates in your Tasks.md, person pages, and project files automatically. Python 3.9 and older won't work - you need 3.10 or newer.
 
 ---
 
