@@ -46,9 +46,18 @@ The system teaches you as you go. Start shallow, go deep as you get curious. Two
 ### What You'll Need
 
 1. **[Cursor](https://cursor.com/)** - Download and install (free account works fine)
-2. **[Node.js](https://nodejs.org/)** - Download the "LTS" version and install (this enables the system's automation features)
+2. **[Git](https://git-scm.com)** - Required for setup and updates
+   - **Mac:** Installs automatically when needed (you'll see a prompt)
+   - **Windows:** Download from [git-scm.com/download/win](https://git-scm.com/download/win)
+3. **[Node.js](https://nodejs.org/)** - Download the "LTS" version and install (this enables the system's automation features)
+4. **[Python 3](https://www.python.org/downloads/)** - Download and install (required for task sync across all files)
+   - **Windows users:** ⚠️ During installation, check the box "Add Python to PATH" - this is critical
 
-That's it. Both installers walk you through setup with default options.
+All installers walk you through setup with default options.
+
+**Why Python?** The Work MCP server (Python-based) enables task sync - when you check off a task in a meeting note, it updates everywhere automatically (person pages, project files, Tasks.md). Without Python, tasks don't sync and you manage them manually.
+
+**Mac users:** If this is your first time using command-line tools, macOS will prompt you to install "Command Line Developer Tools" during setup. Click **Install** when prompted - it's safe and required. Takes 2-3 minutes.
 
 ### About the Command Line
 
@@ -83,6 +92,24 @@ node --version
 **You should see a response like:** `v18.x.x` or `v20.x.x` (must be version 18 or higher)
 
 **If you see "command not found":** Download Node.js from [nodejs.org](https://nodejs.org), install it, then close and reopen your command line and try again.
+
+---
+
+Finally, check Python:
+
+```bash
+python3 --version
+```
+
+**Windows users:** Try `python --version` if `python3` doesn't work.
+
+**You should see a response like:** `Python 3.8.x` or higher (any 3.x version works)
+
+**If you see "command not found":**
+- **Windows:** Python likely isn't in your PATH. Reinstall from [python.org](https://www.python.org/downloads/) and check "Add Python to PATH" during installation. Restart your terminal after.
+- **Mac:** Download Python 3 from [python.org](https://www.python.org/downloads/), install it, then restart your terminal.
+
+**Why Python matters:** It powers the Work MCP server that syncs tasks everywhere. Check off a task in a meeting note → it updates in your Tasks.md, person pages, and project files automatically. Without Python, you'll manually manage task updates across files.
 
 ---
 
@@ -121,6 +148,83 @@ Copy and paste this command and press Enter:
 **When it's done:** You'll see your cursor blinking again, ready for the next command.
 
 ⚠️ **IMPORTANT: You're not done yet. Do Step 3 now to configure your role - this is what makes Dex work.**
+
+<details>
+<summary><strong>Troubleshooting: Common Setup Issues</strong></summary>
+
+### Mac: "Command Line Developer Tools" prompt
+
+If you see a popup asking to install "Command Line Developer Tools":
+
+1. **Click Install** - This is safe and necessary for git to work
+2. **Wait 2-3 minutes** - The installer downloads and installs automatically
+3. **Setup continues automatically** - Once tools are installed, the script resumes
+
+This only happens once. Future updates won't need this.
+
+**What if I accidentally clicked "Cancel"?**
+
+Run this command, then run `./install.sh` again:
+
+```bash
+xcode-select --install
+```
+
+---
+
+### Windows: "python is not recognized" or "pip is not recognized"
+
+This means Python wasn't added to your PATH during installation.
+
+**Fix:**
+
+1. Uninstall Python (Control Panel → Programs)
+2. Download fresh installer from [python.org](https://www.python.org/downloads/)
+3. Run installer
+4. ⚠️ **CHECK THE BOX: "Add Python to PATH"** (on first screen)
+5. Complete installation
+6. **Restart your terminal completely** (close and reopen)
+7. Run `./install.sh` again
+
+---
+
+### Windows: "git is not recognized"
+
+Git for Windows isn't installed.
+
+**Fix:**
+
+1. Download from [git-scm.com/download/win](https://git-scm.com/download/win)
+2. Run installer with default options
+3. **Restart your terminal**
+4. Run `./install.sh` again
+
+---
+
+### All Platforms: "Could not install Python dependencies"
+
+The installer tries two methods automatically. If both fail:
+
+**Try manually:**
+
+```bash
+pip3 install --user mcp pyyaml
+```
+
+**Or on Windows:**
+
+```bash
+pip install --user mcp pyyaml
+```
+
+**If that also fails:**
+
+```bash
+python3 -m pip install --upgrade pip
+pip3 install --user mcp pyyaml
+```
+
+</details>
 
 ### Step 3: Tell Dex About Your Role
 
@@ -309,7 +413,7 @@ Eight jobs that happen reliably every day:
 | **Never Miss a Commitment** | Promises made in meetings extracted automatically. Three days old? Flagged. You can't forget. |
 | **Track Relationships** | Before any call: what you discussed last time, open items, what they care about. Never walk in cold. |
 | **Accelerate Career Growth** | Captures evidence automatically. Feedback from 1:1s, achievements, skills growth. Review-ready when you need it. |
-| **Manage Tasks Reliably** | Unique IDs sync everywhere. Deduplication prevents doubles. Priority limits stop overcommit. Strategic alignment required. |
+| **Manage Tasks Reliably** | Work MCP syncs tasks with unique IDs across all files. Check off once, updates everywhere. Deduplication prevents doubles. Priority limits stop overcommit. Strategic alignment required. |
 | **Reflect & Improve** | Captures mistakes → rules. Learns preferences. Each session makes the next better. |
 | **Keep Projects Moving** | Auto-detects stalls (12+ days no update). Surfaces blockers. You know what needs attention. |
 | **Evolve Itself** | System suggests improvements based on usage patterns. Monitors Claude Code releases daily - when new capabilities drop, explains what they mean for YOUR system and suggests implementations. Captures your improvement ideas too. AI ranks all by impact. `/dex-improve` plans implementation. System adapts to you. |
@@ -327,7 +431,7 @@ Out of the box, working immediately:
 - **25+ ready-to-use skills** - `/daily-plan`, `/meeting-prep`, `/career-coach`, `/week-review` and more - invoke with `/skill-name`
 - **Role-based setup** - 31 roles from CEO to IC, scaffolds appropriate folder structure and workflows. Onboarding MCP enforces validation (email domain required for Internal/External person routing) with session resume capability
 - **Meeting intelligence** - Process transcripts into structured notes with action items auto-synced. Works with Granola MCP (included), or paste transcripts from any source - system recognizes and processes them
-- **Task management with unique IDs** - Tasks sync everywhere automatically (meeting notes, person pages, project files). Deduplication prevents doubles. Priority limits stop overcommit.
+- **Task management with unique IDs (Work MCP)** - Tasks sync everywhere automatically (meeting notes, person pages, project files). Check off once, updates everywhere. Deduplication prevents doubles. Priority limits stop overcommit.
 - **Career development coach** - Captures evidence automatically, prepares reviews, assesses promotion readiness
 - **Person & company pages** - Relationship context for individuals + organization-level rollups (contacts, meetings, tasks)
 - **Compound learning** - Captures preferences and mistakes. Every session makes the next one better.
@@ -410,16 +514,18 @@ Your data stays on your laptop. It's yours.
 
 Tasks in multiple places (meeting notes, project files, person pages) don't sync in traditional systems. Check off one, others stay open.
 
-Dex handles this with unique task IDs. When you process a meeting, action items get IDs like `^task-20260128-001`. Tasks appear in both the meeting note and `03-Tasks/Tasks.md` with the same ID.
+Dex handles this with the **Work MCP server** - a Python-based automation layer that syncs tasks with unique IDs across your entire vault. When you process a meeting, action items get IDs like `^task-20260128-001`. Tasks appear in both the meeting note and `03-Tasks/Tasks.md` with the same ID.
 
 Just tell Dex what you finished in natural language:
 - "I finished following up with John"
 - "Mark the proposal done"  
 - "Completed the API docs"
 
-Dex finds the ID, updates everywhere automatically (Tasks.md, meeting notes, person pages, project pages), adds timestamp: `✅ 2026-01-28 14:35`.
+The Work MCP finds the ID, updates everywhere automatically (Tasks.md, meeting notes, person pages, project pages), adds timestamp: `✅2026-01-28 14:35`.
 
-No manual syncing. No duplicates getting out of sync.
+No manual syncing. No duplicates getting out of sync. One source of truth.
+
+**This is why Python installation is required** - the Work MCP server is the automation engine that makes task sync reliable and automatic.
 
 ---
 
