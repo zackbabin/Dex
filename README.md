@@ -831,7 +831,13 @@ Obsidian is completely optional - Dex works perfectly in Cursor/terminal alone. 
 
 Found this useful? Share with colleagues:
 
-> I've been using an AI personal operating system for my work — handles task management, meeting prep, relationship tracking, and daily planning. Non-engineers can set it up in 10 minutes. Check out the Vibe PM Podcast Episode 8 and the GitHub repo: https://github.com/davekilleen/dex
+> I've been using an AI operating system for the past few weeks that completely changed how I think about AI tools. It's not just another chat interface — it's a personal chief of staff that manages my day-to-day work (meeting prep, task sync, relationship tracking, strategic planning).
+>
+> Here's what surprised me: the system teaches you AI fluency as you use it. You start with pre-built workflows, but within two weeks you're extending it yourself — not coding, just describing what you need and watching it build. It's basically a hands-on course disguised as a productivity tool.
+>
+> If you're thinking about where AI is going and how to build organizational muscle around it, this is the best learning environment I've found. Real stakes, real work, immediate feedback. Non-engineers set it up in 10 minutes.
+>
+> Check out [Episode 8 of The Vibe PM Podcast](TODO-PODCAST-URL) for the full walkthrough, or dive straight into the [GitHub repo](https://github.com/davekilleen/dex). Would love to hear what you build with it.
 
 ---
 
