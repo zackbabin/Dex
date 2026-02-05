@@ -103,29 +103,51 @@ function getDayOfWeek(date: Date = new Date()): number {
  * Parse a task line from Tasks.md
  */
 function parseTaskLine(line: string): Task | null {
-  // Task format: "- [ ] Task title ^task-YYYYMMDD-XXX #P0 #pillar/value"
-  const taskMatch = line.match(/^- \[([ x])\] (.+?)(?:\s+\^(task-\d{8}-\d{3}))?(.*)$/);
+  // Task format: "- [ ] **Task title** — Context ^task-YYYYMMDD-XXX #P0 #pillar/value"
+  const taskMatch = line.match(/^- \[([ xsb])\] (.+)$/);
   if (!taskMatch) return null;
 
-  const [, checkbox, title, taskId, rest] = taskMatch;
+  const [, checkbox, fullText] = taskMatch;
   const status = checkbox === "x" ? "completed" : "open";
 
-  // Extract priority
-  const priorityMatch = rest?.match(/#(P[0-3])/);
-  const priority = (priorityMatch?.[1] as Task["priority"]) || "P2";
+  // Extract task ID
+  const taskIdMatch = fullText.match(/\^(task-\d{8}-\d{3})/);
+  const taskId = taskIdMatch?.[1] || "";
+
+  // Extract title - stop at first — or task ID
+  let title = fullText;
+  
+  // First, extract up to task ID or —
+  const titleMatch = fullText.match(/^(.+?)(?:\s+—|\s+\^task-)/);
+  if (titleMatch) {
+    title = titleMatch[1]!.trim();
+  } else {
+    // No separator found - just take first chunk before any #tags
+    const tagMatch = fullText.match(/^(.+?)(?:\s+#)/);
+    if (tagMatch) {
+      title = tagMatch[1]!.trim();
+    }
+  }
+  
+  // Strip bold markdown (**text**)
+  title = title.replace(/^\*\*(.+?)\*\*$/, "$1").trim();
+
+  // Extract priority from inline tag
+  const priorityMatch = fullText.match(/#(P[0-3])/);
+  const priority = (priorityMatch?.[1] as Task["priority"]) || null;
 
   // Extract pillar
-  const pillarMatch = rest?.match(/#pillar\/([^\s]+)/);
+  const pillarMatch = fullText.match(/#([a-z_]+)/);
   const pillar = pillarMatch?.[1];
 
   // Extract due date
-  const dueDateMatch = rest?.match(/📅 (\d{4}-\d{2}-\d{2})/);
+  const dueDateMatch = fullText.match(/📅 (\d{4}-\d{2}-\d{2})/);
   const dueDate = dueDateMatch?.[1];
 
   return {
-    id: taskId || "",
-    title: title.trim(),
-    priority,
+    id: taskId,
+    title: title,
+    priority: priority || "P2",
     status,
     dueDate,
     pillar,
@@ -141,9 +163,29 @@ export function loadTasks(): Task[] {
   if (!content) return [];
 
   const tasks: Task[] = [];
+  let currentPriority: "P0" | "P1" | "P2" | "P3" = "P2"; // Default priority
+  
   for (const line of content.split("\n")) {
+    // Check for priority section headers: "## P0 - Urgent" or "## This Week"
+    const sectionMatch = line.match(/^##\s+(P[0-3]|This Week)/i);
+    if (sectionMatch) {
+      const section = sectionMatch[1]!.toUpperCase();
+      if (section === "THIS WEEK") {
+        currentPriority = "P1"; // "This Week" tasks default to P1
+      } else {
+        currentPriority = section as "P0" | "P1" | "P2" | "P3";
+      }
+      continue;
+    }
+    
     const task = parseTaskLine(line);
-    if (task) tasks.push(task);
+    if (task) {
+      // Use inline priority if present, otherwise use section priority
+      if (!task.rawLine.match(/#P[0-3]/)) {
+        task.priority = currentPriority;
+      }
+      tasks.push(task);
+    }
   }
 
   return tasks;
