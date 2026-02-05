@@ -159,9 +159,14 @@ function parseTaskLine(line: string): Task | null {
  * Load all tasks from Tasks.md
  */
 export function loadTasks(): Task[] {
+  console.log("[Dex Data Layer] Loading tasks from:", TASKS_PATH);
   const content = readFileSync(TASKS_PATH);
-  if (!content) return [];
+  if (!content) {
+    console.log("[Dex Data Layer] ❌ Tasks file not found or empty");
+    return [];
+  }
 
+  console.log("[Dex Data Layer] Tasks file read, length:", content.length);
   const tasks: Task[] = [];
   let currentPriority: "P0" | "P1" | "P2" | "P3" = "P2"; // Default priority
   
@@ -175,6 +180,7 @@ export function loadTasks(): Task[] {
       } else {
         currentPriority = section as "P0" | "P1" | "P2" | "P3";
       }
+      console.log(`[Dex Data Layer] Section found: ${section} -> Priority: ${currentPriority}`);
       continue;
     }
     
@@ -184,10 +190,12 @@ export function loadTasks(): Task[] {
       if (!task.rawLine.match(/#P[0-3]/)) {
         task.priority = currentPriority;
       }
+      console.log(`[Dex Data Layer] Task parsed: [${task.priority}] ${task.title.substring(0, 40)}`);
       tasks.push(task);
     }
   }
 
+  console.log(`[Dex Data Layer] ✅ Loaded ${tasks.length} total tasks`);
   return tasks;
 }
 
@@ -262,14 +270,25 @@ export function getTaskSummary(): {
 export function loadWeekPriorities(): WeekPriority[] {
   // Read Week_Priorities.md directly
   const weekFilePath = path.join(WEEK_PRIORITIES_PATH, "Week_Priorities.md");
+  console.log("[Dex Data Layer] Loading week priorities from:", weekFilePath);
+  
   const content = readFileSync(weekFilePath);
-  if (!content) return [];
+  if (!content) {
+    console.log("[Dex Data Layer] ❌ Week priorities file not found or empty");
+    return [];
+  }
+
+  console.log("[Dex Data Layer] Week priorities file read, length:", content.length);
 
   // Look for "## 🎯 Top 3 This Week" section
   const topThreeMatch = content.match(/## 🎯 Top 3 This Week[\s\S]*?\n([\s\S]*?)(?=\n---|\n##|$)/);
-  if (!topThreeMatch) return [];
+  if (!topThreeMatch) {
+    console.log("[Dex Data Layer] ❌ Could not find '## 🎯 Top 3 This Week' section");
+    return [];
+  }
 
   const section = topThreeMatch[1]!;
+  console.log("[Dex Data Layer] Found Top 3 section, length:", section.length);
   
   // Extract numbered goals: 1. **Goal text** or 1. Goal text
   const goalRegex = /^\d+\.\s+(?:\*\*)?(.+?)(?:\*\*)?$/gm;
@@ -278,6 +297,7 @@ export function loadWeekPriorities(): WeekPriority[] {
   let match;
   while ((match = goalRegex.exec(section)) !== null) {
     const goalText = match[1]!.trim();
+    console.log(`[Dex Data Layer] Goal found: ${goalText.substring(0, 50)}`);
     
     // Determine if goal is completed (contains ✅ or starts with [x])
     const completed = goalText.includes("✅") || goalText.startsWith("[x]");
@@ -292,6 +312,7 @@ export function loadWeekPriorities(): WeekPriority[] {
     });
   }
 
+  console.log(`[Dex Data Layer] ✅ Loaded ${priorities.length} priorities`);
   return priorities;
 }
 
