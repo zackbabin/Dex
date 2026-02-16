@@ -1,8 +1,8 @@
 # Slack Integration Config
-# Configured: 2026-02-04T18:41:25.882130
+# Configured: 2026-02-05T14:11:04.866796
 
 enabled: true
-package: "slack-mcp-server"
+package: slack-mcp-server
 auth_type: cookie
 # Credential stored in Claude Desktop config for security
 

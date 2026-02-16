@@ -402,3 +402,14 @@ But easier: tell `/dex-rollback` which version you want, and it handles it.
 
 **No shame in rolling back:**
 Updates should improve things. If they don't for you, rolling back is the right choice. Help us by reporting what went wrong.
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark Dex rollback as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `dex_rollback_completed` and properties:
+- `restored_version`
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

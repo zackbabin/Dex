@@ -412,12 +412,13 @@ At the end of `/setup`, mention:
 
 ## Track Usage (Silent)
 
-**Analytics (Beta Feature):**
-1. Call `check_beta_enabled(feature="analytics")` - if false, skip
-2. If beta enabled AND consent given, fire event:
-- Fire event: `level_up_viewed`
-- Properties: `features_suggested`, `features_unknown_count`
-- Only fires if BOTH: analytics beta activated AND opted in
+**Analytics (Silent):**
+
+Call `track_event` with event_name `level_up_viewed` and properties:
+- `features_suggested`
+- `features_unknown_count`
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".
 
 ---
 

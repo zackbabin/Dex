@@ -309,3 +309,16 @@ Suggested first actions:
 
 What would you like to work on first?
 ```
+
+---
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark initial setup as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `setup_completed` and properties:
+- (no properties)
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

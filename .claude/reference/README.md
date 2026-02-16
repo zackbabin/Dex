@@ -1,24 +1,20 @@
-# Reference: The Architecture Layer
+# Reference
 
-**Purpose:** Technical deep dives for Claude when building features, developers extending Dex, and curious users who want to understand how it actually works.
+**Purpose:** Technical documentation for developers and advanced users working on Dex internals.
 
-**⚠️ Skip this if you're just using Dex** - the system works perfectly without reading technical docs. This folder is for when you want to build or understand internals.
-
-**When these docs matter:** You want to add a new MCP server, understand why something works the way it does, debug an integration, or contribute to Dex core. Reference docs are the "how it's built" layer.
+**⚠️ For Technical Users** - This folder contains architecture docs, implementation details, and integration guides. If you're just using Dex, you don't need to read these files.
 
 ---
 
 ## What Is Reference Documentation?
 
-**Reference docs** explain implementation details and architectural decisions. They're conversation between builders - "here's why we did it this way, here's how to extend it, here are the trade-offs."
+**Reference docs** are technical guides that explain *how* and *why* Dex works under the hood. These are for:
+- Claude when implementing new features
+- Developers extending Dex
+- Advanced users debugging issues
+- Contributors understanding the architecture
 
-**Audience:**
-- Claude when implementing new features (reads these to understand patterns)
-- Developers extending Dex (learn how to integrate without breaking things)
-- Advanced users debugging issues (understand what should happen vs what is happening)
-- Contributors understanding the architecture (how pieces fit together)
-
-**Most users don't need these files** - Dex works great without understanding internals. But if you're curious or building, this is where the depth lives.
+**Most users don't need these files** - the system works without understanding internals.
 
 ### Reference vs User Documentation
 
@@ -76,22 +72,11 @@ Reference docs should:
 - Link to related files
 - Explain trade-offs and decisions
 
-## Examples in Dex
+## Examples
 
-- **mcp-servers.md** - MCP architecture deep dive
-  - How Work MCP achieves task sync across all files
-  - Why Career MCP uses bidirectional mapping
-  - Integration patterns for building new MCP servers
-  
-- **meeting-intel.md** - Meeting processing pipeline
-  - How Granola transcripts become structured notes
-  - Action item extraction and routing logic
-  - Person page update triggers
-  
-- **demo-mode.md** - Demo mode architecture
-  - How sample data demonstrates all 8 Jobs to Be Done
-  - Why demo runs in System/Demo/ (isolation from real vault)
-  - Reset and cleanup implementation
+- **mcp-servers.md** - MCP setup, troubleshooting, and integration patterns
+- **meeting-intel.md** - Meeting processing pipeline details
+- **demo-mode.md** - Demo mode implementation and usage
 
 ## Related
 

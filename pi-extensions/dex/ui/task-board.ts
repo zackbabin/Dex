@@ -89,9 +89,11 @@ export class TaskBoard {
 
     const lines: string[] = [];
 
-    // Title
+    // Title - Fixed: calculate border fill based on actual visible width
     const title = this.theme.fg("accent", this.theme.bold("Task Board"));
-    lines.push("┌─ " + title + " " + "─".repeat(Math.max(0, width - 15)) + "┐");
+    const titleWidth = this.getVisibleWidth(title);
+    const borderFill = Math.max(0, width - titleWidth - 5);  // ┌─ (3) + title + space (1) + ┐ (1) = 5
+    lines.push("┌─ " + title + " " + "─".repeat(borderFill) + "┐");
 
     // Column headers
     const columnWidth = Math.floor((width - 2 - this.columns.length - 1) / this.columns.length);

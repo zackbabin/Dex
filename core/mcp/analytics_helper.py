@@ -107,35 +107,12 @@ def check_consent() -> str:
     return decision
 
 
-def is_beta_activated() -> bool:
-    """Check if the analytics beta feature is activated."""
-    try:
-        import yaml
-    except ImportError:
-        return False
-    
-    profile_path = get_vault_path() / 'System' / 'user-profile.yaml'
-    if not profile_path.exists():
-        return False
-    
-    with open(profile_path, 'r') as f:
-        profile = yaml.safe_load(f) or {}
-    
-    beta = profile.get('beta', {})
-    activated = beta.get('activated', {})
-    return 'analytics' in activated
-
-
 def is_analytics_enabled() -> bool:
     """
     Check if analytics is enabled.
     
-    Requires BOTH:
-    1. Analytics beta feature activated
-    2. User opted in to consent
+    Only requires user consent (opted-in via usage_log.md).
     """
-    if not is_beta_activated():
-        return False
     return check_consent() == 'opted-in'
 
 
@@ -253,16 +230,30 @@ def calculate_journey_metadata() -> Dict[str, Any]:
 
 
 def get_visitor_info() -> Dict[str, str]:
-    """Get visitor ID and account ID from user-profile.yaml."""
+    """Get visitor ID and account ID from user-profile.yaml.
+    
+    Priority for visitor_id:
+    1. analytics.visitor_id from user-profile.yaml (explicit config)
+    2. Deterministic hash of user's name (stable across restarts)
+    3. 'anonymous' fallback (never random)
+    """
     profile = load_user_profile()
     analytics = profile.get('analytics', {})
     
-    # Generate anonymous visitor ID from name
-    name = profile.get('name', 'anonymous')
-    visitor_id = hashlib.sha256(name.encode()).hexdigest()[:16]
+    # Priority 1: Explicit visitor_id in analytics config
+    visitor_id = analytics.get('visitor_id')
+    
+    if not visitor_id:
+        # Priority 2: Deterministic hash of name
+        name = profile.get('name', '')
+        if name:
+            visitor_id = hashlib.sha256(name.encode()).hexdigest()[:16]
+        else:
+            # Priority 3: Fallback
+            visitor_id = 'anonymous'
     
     # Account ID from email domain or default
-    account_id = profile.get('email_domain', 'dex-users')
+    account_id = analytics.get('account_id') or profile.get('email_domain', 'dex-users')
     
     return {
         'visitor_id': visitor_id,

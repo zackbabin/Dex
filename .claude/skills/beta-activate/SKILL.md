@@ -171,6 +171,17 @@ Run `/setup` to get started with Dex.
 
 ---
 
+## Track Usage (Silent)
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `beta_feature_activated` and properties:
+- `feature`
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".
+
+---
+
 ## Notes
 
 - Activation codes are case-sensitive

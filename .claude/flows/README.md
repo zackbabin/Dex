@@ -1,16 +1,12 @@
-# Flows: The Setup Experience That Doesn't Suck
+# Flows
 
-**Purpose:** Guided wizards that configure complex features through conversation, not documentation. You answer questions, Dex builds your system.
-
-**Why flows exist:** Setting up systems is cognitively expensive. "Here's 47 configuration options, good luck" doesn't work. Flows turn setup into conversation.
+**Purpose:** Multi-step interactive workflows that guide users through complex processes requiring decisions and input.
 
 ---
 
 ## What Are Flows?
 
-**Flows** are interactive wizards that adapt to your answers and configure your system automatically. Think of it like having an expert guide you through setup rather than reading 20 pages of docs and hoping you didn't miss something.
-
-**The Dex philosophy:** No forced learning. Progressive disclosure. Start shallow, go deep as you get curious. Flows embody this - they ask the minimum required questions and handle the complexity automatically.
+**Flows** are guided setup wizards that walk you through complex processes step by step. They ask questions, adapt based on your answers, and configure your system automatically. Think of them like having someone guide you through setup rather than figuring it out alone.
 
 ### How Flows Work
 
@@ -97,17 +93,10 @@ Flows typically include:
 - File creation or configuration
 - Confirmation of success
 
-## Examples in Dex
+## Examples
 
-- **onboarding.md** - First-time setup that adapts to 31 roles
-  - PM? Gets sprint planning, user story templates, roadmap structure
-  - CFO? Gets financial planning, board prep, metrics dashboards
-  - One conversation, fully configured system
-
-Future flows might include:
-- Career ladder setup (map your progression path)
-- Integration wizards (Slack, Notion, CRM connections)
-- Team rollout (configure Dex for your entire team with shared conventions)
+- **onboarding.md** - First-time Dex setup (creates folders, configures pillars, sets preferences)
+- Future: Integration setup flows, feature enablement guides
 
 ## Related
 

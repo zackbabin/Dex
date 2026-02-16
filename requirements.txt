@@ -1,0 +1,14 @@
+# Dex Plugin Requirements
+# Install with: pip install -r requirements.txt
+
+# Core MCP functionality
+anthropic-mcp>=0.1.0
+
+# Configuration and data handling
+pyyaml>=6.0
+python-dateutil>=2.8.0
+
+# Optional integrations (uncomment if needed)
+# google-auth>=2.16.0
+# google-auth-oauthlib>=1.0.0
+# google-api-python-client>=2.80.0

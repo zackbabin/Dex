@@ -7,16 +7,6 @@ description: Interactive post-onboarding tour with adaptive pathways based on av
 
 Transform the post-onboarding experience from "blank chat window" to guided value delivery. Adaptive based on what data sources are available (calendar, Granola, or neither).
 
-## Interactive Questions
-
-When this flow says to present a structured choice, use the correct tool for the user's environment:
-
-- **Cursor:** Call the `AskQuestion` tool (renders clickable buttons)
-- **Claude Code CLI:** Call the `AskUserQuestion` tool (same purpose, different name)
-- **Neither available:** Fall back to numbered text options
-
-Try `AskQuestion` first. If unavailable, try `AskUserQuestion`. If neither works, use text.
-
 ## When to Run
 
 - Automatically suggested at session start if vault < 7 days old
@@ -317,7 +307,7 @@ Here's what I can create from your Granola history:
 
 ### User Chooses Processing Strategy
 
-**CALL the interactive question tool** (see "Interactive Questions" section above) with these parameters:
+Use AskUserQuestion tool. If AskUserQuestion is not available, prompt in CLI with the same numbered options and capture the selection:
 ```json
 {
   "questions": [{
@@ -425,7 +415,7 @@ def map_strategy_to_ranges(strategy: str, extent: dict) -> dict:
         }
     elif strategy == "skip":
         return None
-    # For "custom", ranges come from separate interactive question tool responses (or text fallback)
+    # For "custom", ranges come from separate AskUserQuestion responses (or CLI fallback)
 ```
 
 **Show confirmation before processing:**
@@ -623,7 +613,7 @@ Here's what I can create from your Granola history:
 • Or skip - I can work with just Granola
 ```
 
-Use the same interactive question tool and processing logic as Flow A (see "Interactive Questions" section).
+Use the same AskUserQuestion and processing logic as Flow A (or CLI fallback).
 
 ---
 
@@ -1064,8 +1054,7 @@ else:
     # Check if there's more data beyond 6 months
     if extent['has_more_data']:
         # Ask if they want to fetch more
-        # CALL AskQuestion (Cursor) or AskUserQuestion (Claude Code) - see Interactive Questions section
-        response = ask_interactive_question({
+        response = AskUserQuestion({
             "questions": [{
                 "id": "fetch_more",
                 "prompt": f"I found {extent['meetings_count']} meetings going back {extent['days_back']} days. There appears to be more data beyond that. Want me to check how much more?",
@@ -1091,9 +1080,11 @@ else:
 
 Update `System/usage_log.md` to mark getting started as used.
 
-**Analytics (Beta Feature):**
-1. Call `check_beta_enabled(feature="analytics")` - if false, skip
-2. If beta enabled AND consent given, fire event:
-- Fire event: `getting_started_completed`
-- Properties: `calendar_connected`, `granola_connected`, `artifacts_created`
-- Only fires if BOTH: analytics beta activated AND opted in
+**Analytics (Silent):**
+
+Call `track_event` with event_name `getting_started_completed` and properties:
+- calendar_connected
+- granola_connected
+- artifacts_created
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

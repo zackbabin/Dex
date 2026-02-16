@@ -25,6 +25,15 @@ from mcp.server.models import InitializationOptions
 import mcp.server.stdio
 import mcp.types as types
 
+# Analytics helper (optional - gracefully degrade if not available)
+try:
+    from analytics_helper import fire_event as _fire_analytics_event
+    HAS_ANALYTICS = True
+except ImportError:
+    HAS_ANALYTICS = False
+    def _fire_analytics_event(event_name, properties=None):
+        return {'fired': False, 'reason': 'analytics_not_available'}
+
 # Import parsing utilities
 from career_parser import (
     parse_evidence_file,
@@ -37,6 +46,14 @@ from career_parser import (
     parse_date_range,
     get_quarter_label,
 )
+
+# Health system — error queue and health reporting
+try:
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from core.utils.dex_logger import log_error as _log_health_error, mark_healthy as _mark_healthy
+    _HAS_HEALTH = True
+except ImportError:
+    _HAS_HEALTH = False
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -281,6 +298,8 @@ async def handle_call_tool(
                 text=json.dumps({"error": f"Unknown tool: {name}"}, indent=2)
             )]
     except Exception as e:
+        if _HAS_HEALTH:
+            _log_health_error("career-mcp", str(e), context={"tool": name})
         logger.error(f"Error in {name}: {e}", exc_info=True)
         return [types.TextContent(
             type="text",
@@ -357,6 +376,11 @@ async def handle_scan_evidence(arguments: dict) -> list[types.TextContent]:
             "category": category
         }
     }
+    
+    try:
+        _fire_analytics_event('career_evidence_scanned')
+    except Exception:
+        pass
     
     return [types.TextContent(
         type="text",
@@ -443,6 +467,10 @@ async def handle_analyze_coverage(arguments: dict) -> list[types.TextContent]:
     evidence_files = scan_evidence_directory(EVIDENCE_DIR, date_range)
     
     if not evidence_files:
+        try:
+            _fire_analytics_event('career_coverage_analyzed')
+        except Exception:
+            pass
         return [types.TextContent(
             type="text",
             text=json.dumps({
@@ -482,6 +510,11 @@ async def handle_analyze_coverage(arguments: dict) -> list[types.TextContent]:
         "analysis_date": datetime.now().isoformat(),
         **coverage_analysis
     }
+    
+    try:
+        _fire_analytics_event('career_coverage_analyzed')
+    except Exception:
+        pass
     
     return [types.TextContent(
         type="text",
@@ -1074,6 +1107,11 @@ async def handle_promotion_readiness_score(arguments: dict) -> list[types.TextCo
         'score_breakdown': score_breakdown
     }
     
+    try:
+        _fire_analytics_event('promotion_readiness_checked')
+    except Exception:
+        pass
+    
     return [types.TextContent(
         type="text",
         text=json.dumps(result, indent=2, cls=DateTimeEncoder)
@@ -1086,6 +1124,8 @@ async def handle_promotion_readiness_score(arguments: dict) -> list[types.TextCo
 
 async def _main():
     """Async main entry point for the MCP server"""
+    if _HAS_HEALTH:
+        _mark_healthy("career-mcp")
     logger.info("Starting Dex Career MCP Server")
     logger.info(f"Vault path: {BASE_DIR}")
     logger.info(f"Career directory: {CAREER_DIR}")

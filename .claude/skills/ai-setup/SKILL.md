@@ -858,6 +858,17 @@ I'll automatically:
 - `/ai-status` → Check configuration
 ```
 
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark AI setup as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `ai_setup_completed` and properties:
+- `mode` (budget_cloud/offline/smart_routing)
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".
+
 ---
 
 ## Follow-up Skill: /ai-status

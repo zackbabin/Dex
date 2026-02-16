@@ -8,6 +8,7 @@
 import { Container, Text, Spacer, truncateToWidth, matchesKey, Key } from "@mariozechner/pi-tui";
 import { CollapsibleSection } from "../ui/collapsible-section.js";
 import type { Theme } from "@mariozechner/pi-coding-agent";
+import { validateLineWidth, getVisibleWidth, calculateBorderFill } from "../ui/tui-validation.js";
 
 export interface Task {
   id: string;
@@ -105,9 +106,13 @@ export class DailyReviewWizard {
 
     const container = new Container();
 
-    // Title
+    // Title - Fixed: use actual visible width, not hardcoded value
     const title = this.theme.fg("accent", this.theme.bold("Daily Review"));
-    container.addChild(new Text("┌─ " + title + " " + "─".repeat(Math.max(0, width - 18)) + "┐", 0, 0));
+    const titleWidth = getVisibleWidth(title);
+    const borderFill = calculateBorderFill(width, titleWidth);
+    const topBorder = "┌─ " + title + " " + "─".repeat(borderFill) + "┐";
+    validateLineWidth(topBorder, width, "DailyReviewWizard", "top border");
+    container.addChild(new Text(topBorder, 0, 0));
     container.addChild(new Text("│" + " ".repeat(width - 2) + "│", 0, 0));
 
     // Completed tasks section
@@ -133,8 +138,10 @@ export class DailyReviewWizard {
     container.addChild(new Text("│ " + this.theme.fg("dim", truncateToWidth(actions, width - 4)) + " ".repeat(Math.max(0, width - 4 - actions.length)) + " │", 0, 0));
     container.addChild(new Text("│" + " ".repeat(width - 2) + "│", 0, 0));
 
-    // Bottom border
-    container.addChild(new Text("└" + "─".repeat(width - 2) + "┘", 0, 0));
+    // Bottom border - Add validation
+    const bottomBorder = "└" + "─".repeat(width - 2) + "┘";
+    validateLineWidth(bottomBorder, width, "DailyReviewWizard", "bottom border");
+    container.addChild(new Text(bottomBorder, 0, 0));
 
     this.cachedWidth = width;
     this.cachedLines = container.render(width);

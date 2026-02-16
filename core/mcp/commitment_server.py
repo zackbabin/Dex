@@ -16,6 +16,7 @@ import asyncio
 import json
 import re
 import os
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -25,6 +26,14 @@ from mcp.server.models import InitializationOptions
 from mcp.server import NotificationOptions, Server
 from mcp.types import Resource, Tool, TextContent
 import mcp.server.stdio
+
+# Health system — error queue and health reporting
+try:
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from core.utils.dex_logger import log_error as _log_health_error, mark_healthy as _mark_healthy
+    _HAS_HEALTH = True
+except ImportError:
+    _HAS_HEALTH = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -547,7 +556,14 @@ async def handle_list_tools():
 @server.call_tool()
 async def handle_call_tool(name: str, arguments: dict):
     """Handle tool calls."""
-    
+    try:
+        return await _handle_call_tool_inner(name, arguments)
+    except Exception as e:
+        if _HAS_HEALTH:
+            _log_health_error("commitment-mcp", str(e), context={"tool": name})
+        raise
+
+async def _handle_call_tool_inner(name: str, arguments: dict):
     if name == "scan_for_commitments":
         # Check if beta is activated first
         if not is_beta_activated():
@@ -759,6 +775,8 @@ async def handle_call_tool(name: str, arguments: dict):
 
 async def main():
     """Run the MCP server."""
+    if _HAS_HEALTH:
+        _mark_healthy("commitment-mcp")
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
         await server.run(
             read_stream,

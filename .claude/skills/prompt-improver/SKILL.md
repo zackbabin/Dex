@@ -220,3 +220,16 @@ Without the API key, the skill still works using the current LLM session.
 **Progressive disclosure:** Flags (`-v`, `-p`) let power users inspect and learn from the improvements.
 
 **Graceful degradation:** Works everywhere - with full API access, partial access, or no external access at all.
+
+---
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark prompt improvement as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `prompt_improved` and properties:
+- (no properties)
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

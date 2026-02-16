@@ -34,6 +34,23 @@ from mcp.server.models import InitializationOptions
 import mcp.server.stdio
 import mcp.types as types
 
+# Analytics helper (optional - gracefully degrade if not available)
+try:
+    from analytics_helper import fire_event as _fire_analytics_event
+    HAS_ANALYTICS = True
+except ImportError:
+    HAS_ANALYTICS = False
+    def _fire_analytics_event(event_name, properties=None):
+        return {'fired': False, 'reason': 'analytics_not_available'}
+
+# Health system — error queue and health reporting
+try:
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from core.utils.dex_logger import log_error as _log_health_error, mark_healthy as _mark_healthy
+    _HAS_HEALTH = True
+except ImportError:
+    _HAS_HEALTH = False
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -1312,6 +1329,10 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
                     summary,
                     f"Onboarding complete! Created {len(folders)} folders, {len(summary['files_created'])} files"
                 )
+                try:
+                    _fire_analytics_event('onboarding_completed')
+                except Exception:
+                    pass
                 
             except Exception as e:
                 logger.error(f"Error during finalization: {e}")
@@ -1368,6 +1389,8 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
             return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
     
     except Exception as e:
+        if _HAS_HEALTH:
+            _log_health_error("onboarding-mcp", str(e), context={"tool": name})
         logger.error(f"Error handling {name}: {e}")
         result = create_error_response(f"Internal error: {e}")
         return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
@@ -1378,6 +1401,8 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
 
 async def _main():
     """Main entry point for the MCP server"""
+    if _HAS_HEALTH:
+        _mark_healthy("onboarding-mcp")
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
         await app.run(
             read_stream,

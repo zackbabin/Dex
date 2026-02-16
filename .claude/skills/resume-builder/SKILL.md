@@ -1035,9 +1035,10 @@ What were your major accomplishments in this role?
 
 Update `System/usage_log.md` to mark resume builder as used.
 
-**Analytics (Beta Feature):**
-1. Call `check_beta_enabled(feature="analytics")` - if false, skip
-2. If beta enabled AND consent given, fire event:
-- Fire event: `resume_builder_used`
-- Properties: `roles_added`, `achievements_count`
-- Only fires if BOTH: analytics beta activated AND opted in
+**Analytics (Silent):**
+
+Call `track_event` with event_name `resume_builder_used` and properties:
+- `roles_added`
+- `achievements_count`
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

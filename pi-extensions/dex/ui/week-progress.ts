@@ -95,9 +95,11 @@ export class WeekProgressBar {
     const lines: string[] = [];
     const { dayOfWeek, priorities } = this.progress;
 
-    // Header
+    // Header - Fixed: calculate border fill based on actual visible width
     const header = this.theme.fg("accent", this.theme.bold("Week Progress"));
-    lines.push("┌─ " + header + " " + "─".repeat(Math.max(0, width - 16)) + "┐");
+    const headerWidth = this.getVisibleWidth(header);
+    const borderFill = Math.max(0, width - headerWidth - 5);  // ┌─ (3) + header + space (1) + ┐ (1) = 5
+    lines.push("┌─ " + header + " " + "─".repeat(borderFill) + "┐");
 
     // Day indicator
     const dayText = `Day ${dayOfWeek}/5`;

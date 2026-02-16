@@ -87,9 +87,10 @@ For red projects:
 
 Update `System/usage_log.md` to mark project health check as used.
 
-**Analytics (Beta Feature):**
-1. Call `check_beta_enabled(feature="analytics")` - if false, skip
-2. If beta enabled AND consent given, fire event:
-- Fire event: `project_health_checked`
-- Properties: `projects_reviewed`, `blockers_found`
-- Only fires if BOTH: analytics beta activated AND opted in
+**Analytics (Silent):**
+
+Call `track_event` with event_name `project_health_checked` and properties:
+- projects_reviewed
+- blockers_found
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

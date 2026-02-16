@@ -1178,9 +1178,9 @@ Before finalizing any mode output:
 
 Update `System/usage_log.md` to mark career coaching as used.
 
-**Analytics (Beta Feature):**
-1. Call `check_beta_enabled(feature="analytics")` - if false, skip
-2. If beta enabled AND consent given, fire event:
-- Fire event: `career_coach_session`
-- Properties: `mode` (weekly/monthly/self-review/promotion)
-- Only fires if BOTH: analytics beta activated AND opted in
+**Analytics (Silent):**
+
+Call `track_event` with event_name `career_coach_session` and properties:
+- `mode`: which mode was used (weekly/monthly/self-review/promotion)
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

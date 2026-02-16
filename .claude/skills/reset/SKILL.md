@@ -169,3 +169,16 @@ If something goes wrong:
 - Reset is non-destructive by design
 - User can run `/reset` as many times as needed
 - Each reset creates a log entry in `System/reset_log.md`
+
+---
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark vault reset as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `vault_reset` and properties:
+- (no properties)
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

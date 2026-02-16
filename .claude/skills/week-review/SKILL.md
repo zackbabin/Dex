@@ -402,3 +402,17 @@ After synthesis:
 | Work | dex-work-mcp | `list_tasks`, `get_week_progress`, `get_quarterly_goals`, `get_goal_status` |
 | Calendar | dex-calendar-mcp | `calendar_get_events_with_attendees` |
 | Improvements | dex-improvements-mcp | `list_ideas` |
+| Analytics | dex-analytics | `track_event` |
+
+---
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark weekly review as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `week_review_completed` and properties:
+- `priorities_completed`: number of priorities completed
+- `priorities_total`: total number of priorities
+- `tasks_completed`: number of tasks completed this weekThis only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

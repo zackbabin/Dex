@@ -21,6 +21,7 @@ Tools:
 """
 
 import os
+import re
 import sys
 import json
 import logging
@@ -33,6 +34,15 @@ from mcp.server import Server, NotificationOptions
 from mcp.server.models import InitializationOptions
 import mcp.server.stdio
 import mcp.types as types
+
+# Analytics helper (optional - gracefully degrade if not available)
+try:
+    from analytics_helper import fire_event as _fire_analytics_event
+    HAS_ANALYTICS = True
+except ImportError:
+    HAS_ANALYTICS = False
+    def _fire_analytics_event(event_name, properties=None):
+        return {'fired': False, 'reason': 'analytics_not_available'}
 
 # Import resume utilities
 from resume_parser import (
@@ -58,6 +68,14 @@ from resume_parser import (
     calculate_ats_score,
     calculate_estimated_pages,
 )
+
+# Health system — error queue and health reporting
+try:
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from core.utils.dex_logger import log_error as _log_health_error, mark_healthy as _mark_healthy
+    _HAS_HEALTH = True
+except ImportError:
+    _HAS_HEALTH = False
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -461,6 +479,8 @@ async def handle_call_tool(
                 text=json.dumps({"error": f"Unknown tool: {name}"}, indent=2)
             )]
     except Exception as e:
+        if _HAS_HEALTH:
+            _log_health_error("resume-mcp", str(e), context={"tool": name})
         logger.error(f"Error in {name}: {e}", exc_info=True)
         return [types.TextContent(
             type="text",
@@ -977,6 +997,11 @@ async def handle_compile_resume(arguments: dict) -> list[types.TextContent]:
         "message": "Resume compiled. Use export_resume to save to file."
     }
     
+    try:
+        _fire_analytics_event('resume_compiled')
+    except Exception:
+        pass
+    
     return [types.TextContent(
         type="text",
         text=json.dumps(result, indent=2)
@@ -1160,6 +1185,8 @@ async def handle_export_resume(arguments: dict) -> list[types.TextContent]:
 
 async def _main():
     """Async main entry point for the MCP server"""
+    if _HAS_HEALTH:
+        _mark_healthy("resume-mcp")
     logger.info("Starting Dex Resume Builder MCP Server")
     logger.info(f"Vault path: {BASE_DIR}")
     logger.info(f"Resume directory: {RESUME_DIR}")

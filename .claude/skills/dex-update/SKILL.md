@@ -310,12 +310,9 @@ git status | grep "both modified"
    - These are user's personal skills
 
 5. **If file is core Dex** (skills, core MCP, scripts) **and user edited it**:
-   - Use the interactive question tool to resolve, instead of a merge editor
+   - Use AskUserQuestion to resolve, instead of a merge editor
 
-**Interactive conflict resolution flow (generic, parameterized):**
-
-Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code CLI) to present the conflict. If neither tool is available, use a numbered text prompt with the same options.
-
+**AskUserQuestion flow (generic, parameterized):**
 ```
 Title: Dex update conflict: {{item_name}}
 
@@ -334,8 +331,8 @@ Options:
 4) Let me tell you what to do (I'll write instructions)
 ```
 
-**Text fallback (if interactive tool not available):**
-- Present the same 4 options as numbered text.
+**If AskUserQuestion is not available (non-Claude Code):**
+- Use a simple CLI prompt with the same 4 options.
 - Add one-line tradeoffs to each option (what you keep vs lose).
 - If user types an invalid choice, re-prompt once and default to "Use Dex version".
 
@@ -423,7 +420,55 @@ npm install
 pip3 install -r core/mcp/requirements.txt
 ```
 
-**C. Enable new background automations (Automatic)**
+**C. Sync MCP Configuration (Automatic)**
+
+Check if new MCP servers were added in the update by comparing `.mcp.json.example` entries against the user's live `.mcp.json` (or `System/.mcp.json`).
+
+For each entry in `.mcp.json.example` that is NOT in the user's `.mcp.json`:
+1. Read the entry from `.mcp.json.example`
+2. Replace `{{VAULT_PATH}}` with the actual vault path
+3. Add to the user's `.mcp.json`
+4. Log: "✓ Added new MCP server: [name]"
+
+**Never remove or modify existing user MCP entries.** Only add missing ones.
+
+**Example:** If `.mcp.json.example` has `dex-analytics` but user's config doesn't:
+```json
+"dex-analytics": {
+  "type": "stdio",
+  "command": "python",
+  "args": ["<vault_path>/core/mcp/analytics_server.py"],
+  "env": { "VAULT_PATH": "<vault_path>" }
+}
+```
+
+Add to summary if new MCPs added: "✓ Added new MCP servers: dex-analytics"
+
+**D. Sync Usage Log Features (Automatic)**
+
+Merge new feature entries from the template `System/usage_log.md` into the user's existing `System/usage_log.md`.
+
+**Merge logic:**
+1. Read the upstream template `System/usage_log.md` (from the just-updated dex-core files)
+2. Read the user's existing `System/usage_log.md`
+3. For each `- [ ]` or `- [x]` line in the template:
+   - Extract the feature description (text after the checkbox)
+   - Search the user's file for a line containing the same feature description
+   - **If found:** Keep the user's version (preserves their `[x]` state)
+   - **If NOT found:** This is a new feature — add it to the same section in the user's file
+4. Preserve ALL user state: checked boxes, consent decisions, journey metadata, dates
+5. Update the feature count in `Feature adoption score: X/Y` (Y = new total)
+
+**Section matching:** Match new entries to the correct section by the `## Section Name` headers (e.g., "## Core Workflows", "## Advanced"). If a new section exists in the template but not in the user's file, add the entire section.
+
+**Never:**
+- Uncheck a user's checked box
+- Change consent or metadata values
+- Remove entries the user has
+
+Log: "✓ Added N new features to usage_log.md" (or "✓ Usage log up to date" if nothing added)
+
+**E. Enable new background automations (Automatic)**
 
 Check for automation scripts that need installation. These run silently without prompting.
 
@@ -587,11 +632,15 @@ You have some integrations that could be upgraded to Dex recommended packages:
 
 ### Step 10: Track Usage (Silent)
 
-Update usage log:
-```
-System/usage_log.md
-- [ ] Update Dex (/dex-update) → [x] Update Dex (/dex-update)
-```
+Update `System/usage_log.md` to mark Dex update as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `dex_update_completed` and properties:
+- `from_version`
+- `to_version`
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".
 
 ---
 

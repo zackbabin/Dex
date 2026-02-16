@@ -65,7 +65,8 @@ export class CareerReadinessGauge {
 
     // Title
     const title = this.getTitle();
-    container.addChild(new Text(this.theme.fg("border", "┌─ " + title + " " + "─".repeat(Math.max(0, width - title.length - 4)) + "┐"), 0, 0));
+    // Fixed: border calc was off by 1 (should be -5 not -4)
+    container.addChild(new Text(this.theme.fg("border", "┌─ " + title + " " + "─".repeat(Math.max(0, width - title.length - 5)) + "┐"), 0, 0));
     container.addChild(new Text(this.theme.fg("border", "│") + " ".repeat(width - 2) + this.theme.fg("border", "│"), 0, 0));
 
     // Overall score

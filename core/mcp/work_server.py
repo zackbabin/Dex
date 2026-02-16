@@ -33,6 +33,15 @@ from mcp.server.models import InitializationOptions
 import mcp.server.stdio
 import mcp.types as types
 
+# Analytics helper (optional - gracefully degrade if not available)
+try:
+    from analytics_helper import fire_event as _fire_analytics_event
+    HAS_ANALYTICS = True
+except ImportError:
+    HAS_ANALYTICS = False
+    def _fire_analytics_event(event_name, properties=None):
+        return {'fired': False, 'reason': 'analytics_not_available'}
+
 # Set up logging first (before any imports that might use it)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -55,6 +64,21 @@ try:
 except ImportError:
     logger.warning("Reference formatter not available - wiki links disabled")
     HAS_REFERENCE_FORMATTER = False
+
+# Import QMD search index refresh (optional - silently skips if QMD not installed)
+try:
+    from core.utils.qmd_indexer import refresh_search_index
+    HAS_QMD = True
+except ImportError:
+    HAS_QMD = False
+    def refresh_search_index(): pass
+
+# Health system — error queue and health reporting
+try:
+    from core.utils.dex_logger import log_error as _log_health_error, mark_healthy as _mark_healthy
+    _HAS_HEALTH = True
+except ImportError:
+    _HAS_HEALTH = False
 
 # Custom JSON encoder for handling date/datetime objects
 class DateTimeEncoder(json.JSONEncoder):
@@ -1476,6 +1500,124 @@ def find_linked_tasks(priority_id: str) -> List[Dict[str, Any]]:
     return linked_tasks
 
 # ============================================================================
+# GOAL INFERENCE FOR WEEKLY PRIORITIES
+# ============================================================================
+
+# Stop words to exclude from keyword matching
+_STOP_WORDS = frozenset({
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
+    'has', 'have', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+    'should', 'may', 'might', 'shall', 'can', 'this', 'that', 'these',
+    'those', 'i', 'we', 'you', 'he', 'she', 'it', 'they', 'my', 'our',
+    'your', 'his', 'her', 'its', 'their', 'up', 'out', 'if', 'about',
+    'into', 'through', 'during', 'before', 'after', 'all', 'each', 'every',
+    'both', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'not',
+    'only', 'same', 'so', 'than', 'too', 'very', 'just', 'because',
+    'as', 'until', 'while', 'get', 'make', 'run', 'set', 'new', 'first',
+    'work', 'start', 'complete', 'finish', 'build', 'create', 'deliver',
+})
+
+def _tokenize(text: str) -> set:
+    """Lowercase, strip punctuation, remove stop words."""
+    words = re.findall(r'[a-z0-9]+', text.lower())
+    return {w for w in words if w not in _STOP_WORDS and len(w) > 1}
+
+
+def infer_goal_link(priority_title: str, priority_pillar: str,
+                    goals: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Score each quarterly goal against a proposed weekly priority.
+
+    Returns a ranked list of candidates:
+      [{ goal_id, goal_title, score, confidence, reason }, ...]
+
+    Scoring (0-100):
+      - Pillar exact match:  +30
+      - Title keyword overlap (Jaccard-ish):  up to +40
+      - Milestone keyword overlap:  up to +20
+      - Success-criteria keyword overlap:  up to +10
+    
+    Confidence bands:
+      score >= 60  → 'strong'   (auto-link)
+      score 30-59  → 'weak'     (ask user)
+      score < 30   → 'none'     (tag operational)
+    """
+    priority_tokens = _tokenize(priority_title)
+    if not priority_tokens:
+        return []
+
+    candidates = []
+    for goal in goals:
+        score = 0
+        reasons = []
+        goal_id = goal.get('goal_id', '')
+        goal_title = goal.get('title', '')
+        goal_pillar = goal.get('pillar', '')
+
+        # --- Pillar match ---
+        # Normalize pillar names: the goal stores display name like "deal_support",
+        # the priority pillar may be the key or the display name
+        pillar_a = priority_pillar.lower().replace(' ', '_')
+        pillar_b = goal_pillar.lower().replace(' ', '_')
+        if pillar_a == pillar_b:
+            score += 30
+            reasons.append('pillar_match')
+
+        # --- Title keyword overlap ---
+        goal_title_tokens = _tokenize(goal_title)
+        if goal_title_tokens and priority_tokens:
+            overlap = priority_tokens & goal_title_tokens
+            union = priority_tokens | goal_title_tokens
+            jaccard = len(overlap) / len(union) if union else 0
+            title_score = int(jaccard * 40)
+            if overlap:
+                score += max(title_score, 15)  # Floor of 15 if any keyword match
+                reasons.append(f'title_keywords({",".join(sorted(overlap))})')
+
+        # --- Milestone keyword overlap ---
+        milestone_tokens = set()
+        for m in goal.get('milestones', []):
+            milestone_tokens |= _tokenize(m.get('title', ''))
+        if milestone_tokens and priority_tokens:
+            overlap = priority_tokens & milestone_tokens
+            if overlap:
+                milestone_score = min(int((len(overlap) / len(priority_tokens)) * 20), 20)
+                score += max(milestone_score, 8)  # Floor of 8 if any match
+                reasons.append(f'milestone_keywords({",".join(sorted(overlap))})')
+
+        # --- Success criteria overlap ---
+        criteria_tokens = _tokenize(goal.get('success_criteria', ''))
+        if criteria_tokens and priority_tokens:
+            overlap = priority_tokens & criteria_tokens
+            if overlap:
+                criteria_score = min(int((len(overlap) / len(priority_tokens)) * 10), 10)
+                score += criteria_score
+                reasons.append(f'criteria_keywords({",".join(sorted(overlap))})')
+
+        # Determine confidence
+        if score >= 60:
+            confidence = 'strong'
+        elif score >= 30:
+            confidence = 'weak'
+        else:
+            confidence = 'none'
+
+        candidates.append({
+            'goal_id': goal_id,
+            'goal_title': goal_title,
+            'goal_pillar': goal_pillar,
+            'score': score,
+            'confidence': confidence,
+            'reasons': reasons
+        })
+
+    # Sort by score descending
+    candidates.sort(key=lambda c: c['score'], reverse=True)
+    return candidates
+
+
+# ============================================================================
 # TASK PARSING AND MANAGEMENT
 # ============================================================================
 
@@ -2523,13 +2665,13 @@ async def handle_list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="create_weekly_priority",
-            description="Create a weekly priority with optional link to quarterly goal",
+            description="Create a weekly priority with auto-inference of quarterly goal link. If quarterly_goal_id is omitted, the system scores all quarterly goals by pillar match + keyword overlap and auto-links (strong match), tentatively links (weak match), or tags as operational (no match). The response includes goal_inference details.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "title": {"type": "string", "description": "Priority title (specific outcome)"},
                     "pillar": {"type": "string", "enum": pillar_ids, "description": f"Which strategic pillar ({pillar_description})"},
-                    "quarterly_goal_id": {"type": "string", "description": "Goal ID this priority advances (optional, use 'operational' for non-goal work)"},
+                    "quarterly_goal_id": {"type": "string", "description": "Goal ID this priority advances. If omitted, system auto-infers from title+pillar. Use 'operational' to explicitly mark non-goal work."},
                     "success_criteria": {"type": "string", "description": "What success looks like for this priority"},
                     "week_date": {"type": "string", "description": "Monday of target week (YYYY-MM-DD) - defaults to current week"}
                 },
@@ -2586,6 +2728,28 @@ async def handle_list_tools() -> list[types.Tool]:
             name="migrate_weekly_priorities",
             description="Add IDs to existing weekly priorities that don't have them (one-time migration)",
             inputSchema={"type": "object", "properties": {}}
+        ),
+        # ========== GOAL-ALIGNED PLANNING TOOLS ==========
+        types.Tool(
+            name="get_weekly_planning_context",
+            description="Pre-planning intelligence: surfaces quarterly goal health, weeks remaining, stale goals, and next actionable milestones. Call this BEFORE creating weekly priorities so the week plan ladders into quarterly goals.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "proposed_priorities": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "title": {"type": "string"},
+                                "pillar": {"type": "string"}
+                            },
+                            "required": ["title", "pillar"]
+                        },
+                        "description": "Optional: proposed priority titles+pillars to auto-match against goals before creating them"
+                    }
+                }
+            }
         ),
         # ========== NEW PLANNING INTELLIGENCE TOOLS ==========
         types.Tool(
@@ -2667,11 +2831,36 @@ async def handle_list_tools() -> list[types.Tool]:
         )
     ]
 
+# Tools that write to vault files and should trigger search index refresh
+WRITE_TOOLS = {
+    "create_task", "update_task_status", "create_company", "refresh_company",
+    "sync_task_refs", "create_quarterly_goal", "update_goal_progress",
+    "create_weekly_priority", "complete_weekly_priority",
+    "process_inbox_with_dedup", "migrate_quarterly_goals", "migrate_weekly_priorities",
+}
+
 @app.call_tool()
 async def handle_call_tool(
     name: str, arguments: dict | None
 ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
     """Handle tool calls"""
+    try:
+        result = await _handle_call_tool_inner(name, arguments)
+
+        # Refresh QMD search index after any write operation (non-blocking)
+        if name in WRITE_TOOLS:
+            refresh_search_index()
+
+        return result
+    except Exception as e:
+        if _HAS_HEALTH:
+            _log_health_error("work-mcp", str(e), context={"tool": name})
+        raise
+
+async def _handle_call_tool_inner(
+    name: str, arguments: dict | None
+) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+    """Inner tool handler — wrapped by handle_call_tool for post-write hooks."""
     
     if name == "list_tasks":
         tasks = get_all_tasks()
@@ -2822,6 +3011,15 @@ async def handle_call_tool(
             if result_sync['success']:
                 synced_pages.append(person)
         
+        # Fire analytics event (silent, best-effort)
+        try:
+            _fire_analytics_event('task_created', {
+                'pillar': pillar,
+                'priority': priority,
+            })
+        except Exception:
+            pass
+        
         result = {
             "success": True,
             "task": {
@@ -2855,6 +3053,12 @@ async def handle_call_tool(
             synced_pages = propagate_task_status_to_refs(result['title'], completed)
             result['related_tasks_synced'] = synced_pages
             
+            if completed:
+                try:
+                    _fire_analytics_event('task_completed', {'method': 'task_id'})
+                except Exception:
+                    pass
+            
             return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
         
         # If task_title provided, find the task and get its ID
@@ -2877,6 +3081,12 @@ async def handle_call_tool(
                 # Also sync Related Tasks sections
                 synced_pages = propagate_task_status_to_refs(task['title'], completed)
                 result['related_tasks_synced'] = synced_pages
+                
+                if completed:
+                    try:
+                        _fire_analytics_event('task_completed', {'method': 'task_title'})
+                    except Exception:
+                        pass
                 
                 return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
             
@@ -2902,6 +3112,13 @@ async def handle_call_tool(
                 synced_pages = propagate_task_status_to_refs(task['title'], completed)
                 
                 status_name = STATUS_CODES.get(new_status, new_status)
+                
+                if completed:
+                    try:
+                        _fire_analytics_event('task_completed', {'method': 'legacy'})
+                    except Exception:
+                        pass
+                
                 result = {
                     "success": True,
                     "task": task['title'],
@@ -3327,6 +3544,57 @@ async def handle_call_tool(
             today = date.today()
             week_date = today - timedelta(days=today.weekday())  # Monday of current week
         
+        # ---- GOAL INFERENCE ----
+        # If no goal_id provided, try to infer from title + pillar
+        goal_inference = None
+        if not quarterly_goal_id:
+            goals_file = QUARTER_GOALS_FILE
+            if is_demo_mode():
+                goals_file = DEMO_DIR / '01-Quarter_Goals/Quarter_Goals.md'
+            goals = parse_quarterly_goals(goals_file) if goals_file.exists() else []
+            
+            if goals:
+                candidates = infer_goal_link(title, pillar, goals)
+                top = candidates[0] if candidates else None
+                
+                if top and top['confidence'] == 'strong':
+                    # Auto-link with strong confidence
+                    quarterly_goal_id = top['goal_id']
+                    goal_inference = {
+                        'action': 'auto_linked',
+                        'goal_id': top['goal_id'],
+                        'goal_title': top['goal_title'],
+                        'confidence': 'strong',
+                        'score': top['score'],
+                        'reasons': top['reasons'],
+                        'message': f"Auto-linked to \"{top['goal_title']}\" (strong match: {', '.join(top['reasons'])})"
+                    }
+                elif top and top['confidence'] == 'weak':
+                    # Suggest but don't auto-link — use the top candidate as tentative link
+                    quarterly_goal_id = top['goal_id']
+                    alternatives = [
+                        {'goal_id': c['goal_id'], 'goal_title': c['goal_title'], 'score': c['score']}
+                        for c in candidates[1:3] if c['confidence'] != 'none'
+                    ]
+                    goal_inference = {
+                        'action': 'tentative_link',
+                        'goal_id': top['goal_id'],
+                        'goal_title': top['goal_title'],
+                        'confidence': 'weak',
+                        'score': top['score'],
+                        'reasons': top['reasons'],
+                        'alternatives': alternatives,
+                        'message': f"Tentatively linked to \"{top['goal_title']}\" (weak match). Alternatives: {', '.join(a['goal_title'] for a in alternatives) if alternatives else 'none'}. Confirm or adjust."
+                    }
+                else:
+                    # No match — tag as operational and warn
+                    quarterly_goal_id = 'operational'
+                    goal_inference = {
+                        'action': 'no_match',
+                        'confidence': 'none',
+                        'message': f"No quarterly goal match found for \"{title}\". Tagged as operational. If this advances a goal, specify quarterly_goal_id explicitly."
+                    }
+        
         # Parse existing priorities to generate ID
         priorities_file = get_week_priorities_file()
         existing_priorities = parse_weekly_priorities(priorities_file) if priorities_file.exists() else []
@@ -3371,7 +3639,8 @@ async def handle_call_tool(
             "title": title,
             "pillar": pillar_name,
             "week_date": week_date.isoformat(),
-            "linked_goal": quarterly_goal_id if quarterly_goal_id != 'operational' else None,
+            "linked_goal": quarterly_goal_id if quarterly_goal_id and quarterly_goal_id != 'operational' else None,
+            "goal_inference": goal_inference,
             "message": f"Created weekly priority: {title}"
         }
         return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
@@ -3398,10 +3667,37 @@ async def handle_call_tool(
                 priority['linked_tasks_count'] = len(linked_tasks)
                 priority['completed_tasks'] = sum(1 for t in linked_tasks if t['completed'])
         
+        # ---- ALIGNMENT SUMMARY ----
+        goals_file = QUARTER_GOALS_FILE
+        if is_demo_mode():
+            goals_file = DEMO_DIR / '01-Quarter_Goals/Quarter_Goals.md'
+        goals = parse_quarterly_goals(goals_file) if goals_file.exists() else []
+        quarter_info = get_quarter_info()
+
+        linked_count = sum(1 for p in priorities if p.get('linked_goal_id'))
+        unlinked_count = len(priorities) - linked_count
+        
+        # Which goals are covered this week?
+        covered_goal_ids = {p['linked_goal_id'] for p in priorities if p.get('linked_goal_id')}
+        uncovered_goals = [
+            {'goal_id': g.get('goal_id'), 'title': g.get('title'), 'progress': g.get('progress', 0)}
+            for g in goals if g.get('goal_id') and g['goal_id'] not in covered_goal_ids
+        ]
+
+        alignment_summary = {
+            'priorities_linked_to_goals': linked_count,
+            'priorities_unlinked': unlinked_count,
+            'goals_covered_this_week': list(covered_goal_ids),
+            'goals_not_covered_this_week': uncovered_goals,
+            'quarter': quarter_info.get('quarter', ''),
+            'weeks_remaining': quarter_info.get('weeks_remaining', 0)
+        }
+
         result = {
             "week_date": week_date.isoformat(),
             "priorities": priorities,
-            "count": len(priorities)
+            "count": len(priorities),
+            "alignment_summary": alignment_summary
         }
         return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
@@ -3621,6 +3917,104 @@ async def handle_call_tool(
         result = migrate_weekly_priorities()
         return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
+    # ========== GOAL-ALIGNED PLANNING HANDLERS ==========
+
+    elif name == "get_weekly_planning_context":
+        # Pre-planning intelligence: goal health + optional priority matching
+        goals_file = QUARTER_GOALS_FILE
+        if is_demo_mode():
+            goals_file = DEMO_DIR / '01-Quarter_Goals/Quarter_Goals.md'
+
+        goals = parse_quarterly_goals(goals_file) if goals_file.exists() else []
+        quarter_info = get_quarter_info()
+        weeks_remaining = quarter_info.get('weeks_remaining', 0)
+        weeks_elapsed = 13 - weeks_remaining
+
+        # Build goal health report
+        goal_health = []
+        for goal in goals:
+            linked_priorities = find_linked_priorities(goal.get('goal_id', ''))
+            completed_milestones = sum(1 for m in goal.get('milestones', []) if m.get('completed'))
+            total_milestones = len(goal.get('milestones', []))
+            next_milestone = None
+            for m in goal.get('milestones', []):
+                if not m.get('completed'):
+                    next_milestone = m.get('title')
+                    break
+
+            goal_health.append({
+                'goal_id': goal.get('goal_id'),
+                'title': goal.get('title'),
+                'pillar': goal.get('pillar'),
+                'progress': goal.get('progress', 0),
+                'milestones_completed': completed_milestones,
+                'milestones_total': total_milestones,
+                'next_milestone': next_milestone,
+                'linked_priority_count': len(linked_priorities),
+                'has_activity': len(linked_priorities) > 0,
+            })
+
+        # Identify neglected goals (0 linked priorities)
+        neglected_goals = [g for g in goal_health if not g['has_activity']]
+
+        # Auto-match proposed priorities against goals if provided
+        proposed = arguments.get('proposed_priorities', []) if arguments else []
+        matched_priorities = []
+        for prop in proposed:
+            candidates = infer_goal_link(prop['title'], prop['pillar'], goals)
+            top = candidates[0] if candidates else None
+            matched_priorities.append({
+                'title': prop['title'],
+                'pillar': prop['pillar'],
+                'inferred_goal': {
+                    'goal_id': top['goal_id'],
+                    'goal_title': top['goal_title'],
+                    'confidence': top['confidence'],
+                    'score': top['score'],
+                    'reasons': top['reasons']
+                } if top and top['confidence'] != 'none' else None,
+                'alternatives': [
+                    {'goal_id': c['goal_id'], 'goal_title': c['goal_title'], 'score': c['score'], 'confidence': c['confidence']}
+                    for c in candidates[1:3] if c['confidence'] != 'none'
+                ] if candidates else [],
+                'is_operational': not top or top['confidence'] == 'none'
+            })
+
+        # Build recommendations
+        recommendations = []
+        if neglected_goals:
+            names = ', '.join(f"Goal {g['goal_id']}: {g['title']}" for g in neglected_goals)
+            recommendations.append(f"{len(neglected_goals)} goals have zero weekly activity: {names}")
+        if weeks_remaining <= 4:
+            recommendations.append(f"Only {weeks_remaining} weeks left in {quarter_info['quarter']} - prioritize goals with 0% progress")
+        operational_count = sum(1 for mp in matched_priorities if mp['is_operational'])
+        if operational_count > 0 and len(matched_priorities) > 0:
+            recommendations.append(f"{operational_count} of {len(matched_priorities)} proposed priorities don't map to any quarterly goal")
+
+        # Suggest priorities based on next milestones of neglected goals
+        suggested_priorities = []
+        for g in neglected_goals:
+            if g['next_milestone']:
+                suggested_priorities.append({
+                    'suggested_title': g['next_milestone'],
+                    'from_goal': g['goal_id'],
+                    'goal_title': g['title'],
+                    'pillar': g['pillar']
+                })
+
+        result = {
+            'quarter': quarter_info['quarter'],
+            'weeks_elapsed': weeks_elapsed,
+            'weeks_remaining': weeks_remaining,
+            'total_goals': len(goals),
+            'goal_health': goal_health,
+            'neglected_goals_count': len(neglected_goals),
+            'matched_priorities': matched_priorities if matched_priorities else None,
+            'suggested_priorities_from_goals': suggested_priorities if suggested_priorities else None,
+            'recommendations': recommendations
+        }
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
+
     # ========== NEW PLANNING INTELLIGENCE HANDLERS ==========
     
     elif name == "get_week_progress":
@@ -3747,6 +4141,8 @@ async def handle_call_tool(
 
 async def _main():
     """Async main entry point for the MCP server"""
+    if _HAS_HEALTH:
+        _mark_healthy("work-mcp")
     logger.info(f"Starting Dex Work MCP Server")
     logger.info(f"Vault path: {BASE_DIR}")
     logger.info(f"Tasks file: {get_tasks_file()}")

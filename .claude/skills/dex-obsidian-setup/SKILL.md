@@ -137,3 +137,13 @@ You can still use Dex in Cursor/terminal exactly as before. Wiki links work ever
 - Migration creates a git backup before making changes
 - Revert anytime with `git reset --hard HEAD~1`
 - Works with vaults of any size (10K+ files tested)
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark Obsidian setup as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `obsidian_enabled` (no properties).
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

@@ -36,6 +36,15 @@ import mcp.types as types
 VAULT_PATH = Path(os.environ.get('VAULT_PATH', Path.cwd()))
 PEOPLE_DIR = VAULT_PATH / "People"
 
+# Health system — error queue and health reporting
+try:
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from core.utils.dex_logger import log_error as _log_health_error, mark_healthy as _mark_healthy
+    _HAS_HEALTH = True
+except ImportError:
+    _HAS_HEALTH = False
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -448,9 +457,21 @@ async def handle_call_tool(
     name: str, arguments: dict | None
 ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
     """Handle tool calls"""
-    
+    try:
+        return await _handle_call_tool_inner(name, arguments)
+    except Exception as e:
+        if _HAS_HEALTH:
+            _log_health_error("calendar-mcp", str(e), context={"tool": name})
+        raise
+
+
+async def _handle_call_tool_inner(
+    name: str, arguments: dict | None
+) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+    """Inner tool handler — wrapped by handle_call_tool for health reporting."""
+
     arguments = arguments or {}
-    
+
     if name == "calendar_list_calendars":
         # Use fast EventKit
         success, output = run_shell_script("calendar_eventkit.py", "list")
@@ -739,6 +760,8 @@ async def handle_call_tool(
 
 async def _main():
     """Async main entry point for the MCP server"""
+    if _HAS_HEALTH:
+        _mark_healthy("calendar-mcp")
     logger.info("Starting Dex Calendar MCP Server")
     logger.info("Using Apple Calendar via AppleScript")
     

@@ -847,3 +847,16 @@ If user runs specific educational modes, update the AI Education Progress sectio
 - **Show don't tell** — Point to actual files, tools, actions
 - **Empowering not impressive** — Goal is their understanding, not your cleverness
 - **Inviting curiosity** — End with pathways to learn more
+
+---
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark AI transparency education as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `xray_used` and properties:
+- `mode` (context/tokens/prompts/tools/hooks/vault/extend)
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

@@ -27,6 +27,23 @@ from mcp.server.models import InitializationOptions
 import mcp.server.stdio
 import mcp.types as types
 
+# Analytics helper (optional - gracefully degrade if not available)
+try:
+    from analytics_helper import fire_event as _fire_analytics_event
+    HAS_ANALYTICS = True
+except ImportError:
+    HAS_ANALYTICS = False
+    def _fire_analytics_event(event_name, properties=None):
+        return {'fired': False, 'reason': 'analytics_not_available'}
+
+# Health system — error queue and health reporting
+try:
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from core.utils.dex_logger import log_error as _log_health_error, mark_healthy as _mark_healthy
+    _HAS_HEALTH = True
+except ImportError:
+    _HAS_HEALTH = False
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -719,7 +736,19 @@ async def handle_call_tool(
     name: str, arguments: dict | None
 ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
     """Handle tool calls"""
-    
+    try:
+        return await _handle_call_tool_inner(name, arguments)
+    except Exception as e:
+        if _HAS_HEALTH:
+            _log_health_error("dex-improvements-mcp", str(e), context={"tool": name})
+        raise
+
+
+async def _handle_call_tool_inner(
+    name: str, arguments: dict | None
+) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+    """Inner tool handler — wrapped by handle_call_tool for health reporting."""
+
     if name == "capture_idea":
         title = arguments['title']
         description = arguments['description']
@@ -766,6 +795,10 @@ async def handle_call_tool(
                     "Check `System/Dex_Backlog.md` to see all your ideas"
                 ]
             }
+            try:
+                _fire_analytics_event('idea_captured', {'category': category})
+            except Exception:
+                pass
         else:
             result = {
                 "success": False,
@@ -827,6 +860,12 @@ async def handle_call_tool(
         impl_date = arguments.get('implementation_date')
         
         result = mark_idea_implemented(idea_id, impl_date)
+        
+        if result.get('success'):
+            try:
+                _fire_analytics_event('idea_implemented')
+            except Exception:
+                pass
         
         return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
@@ -1087,6 +1126,8 @@ async def handle_call_tool(
 
 async def _main():
     """Async main entry point for the MCP server"""
+    if _HAS_HEALTH:
+        _mark_healthy("dex-improvements-mcp")
     logger.info(f"Starting Dex Improvements MCP Server")
     logger.info(f"Vault path: {BASE_DIR}")
     logger.info(f"Backlog file: {BACKLOG_FILE}")

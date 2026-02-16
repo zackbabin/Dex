@@ -113,3 +113,13 @@ Want to save money or work offline? Run `/ai-setup` to configure:
 
 When you're back online, I'll automatically have access to Claude again.
 ```
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark AI status check as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `ai_status_checked` (no properties).
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

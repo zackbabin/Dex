@@ -275,24 +275,6 @@ After making significant system changes (new commands, CLAUDE.md edits, structur
 
 **No [Unreleased] section.** Everything in the changelog has already been pushed to GitHub — that IS the release. When adding an entry, give it a version number and today's date immediately. The `/dex-push` skill handles versioning at push time.
 
-### Analytics Tracking for New Capabilities
-
-**When creating any new skill, MCP tool, or capability, add analytics tracking:**
-
-1. **Define the event** - What event should fire? Follow naming: `{feature}_completed`
-2. **Add to usage_log.md** - Add a checkbox in the appropriate section
-3. **Wire up the event** - Add event firing in the skill/MCP (only fires if user opted in)
-
-**Event naming convention:**
-- Skills: `{skill_name}_completed` (e.g., `daily_plan_completed`)
-- MCP tools: `{tool_name}_used` (e.g., `task_created`)
-
-**Checklist:** See `.claude/reference/skill-analytics-checklist.md`
-
-**Privacy rules:**
-- Only track Dex built-in features (not user customizations)
-- Track THAT features were used, not WHAT users did with them
-- Never send content, names, notes, or conversations
 
 ### Context Injection (Silent)
 Person and company context hooks run automatically when reading files:
@@ -301,47 +283,53 @@ Person and company context hooks run automatically when reading files:
 - Context is wrapped in XML tags (`<person_context>`, `<company_context>`) for background enrichment
 - No visible headers in responses - reference naturally when relevant
 
-### Analytics Consent (One-Time Ask)
+### Analytics Consent (Persistent Until Decided)
 
-**Beta Feature:** Only applies if user has activated the analytics beta.
+**Check `System/usage_log.md` → Analytics Consent section at session start AND before major skills.**
 
-**Before any major skill, check:**
-1. Call `check_beta_enabled(feature="analytics")` from Beta MCP
-2. If NOT enabled → skip analytics entirely (no prompt, no tracking)
-3. If enabled → check `System/usage_log.md` → Analytics Consent section
+**When to ask:**
+- At the start of every new session (first message)
+- Before `/daily-plan`, `/week-plan`, `/review`, or `/week-review`
+- **Frequency limit:** Only ask once per session. If they don't respond (change subject, ignore it), that's fine — ask again next session.
 
-**If analytics beta is enabled AND `Consent decision: pending`:**
+**When NOT to ask:**
+- `Consent decision: opted-in` → Already decided, skip silently
+- `Consent decision: opted-out` → Already decided, never ask again
 
-During `/daily-plan`, `/week-plan`, `/review`, or `/week-review`, ask ONCE per session:
+If `Consent decision: pending`, show this prompt:
 
 ```
 Quick question before we continue:
 
-Dave could use your help improving Dex. By sharing anonymous feature usage—things 
-like "ran /daily-plan" or "created a task"—you help show what's working and what needs improvement.
+**The developer behind Dex could use your help improving it.** By sharing anonymous 
+feature usage — things like "ran /daily-plan" or "created a task" — you help show 
+what's working and what needs improvement.
 
 • Only Dex built-in features are tracked, not anything you customize or add
-• Dave never sees what you DO with features—just that you used them
+• Nobody sees what you DO with features — just that you used them
 • No content, names, notes, or conversations are ever sent
-• To opt out later, just say "turn off Dex analytics" anytime
+• You can change this anytime in System/user-profile.yaml
 
-Help improve Dex? [Yes, happy to help] / [No thanks]
+**Help improve Dex?** [Yes, happy to help] / [No thanks]
 ```
 
-2. Based on response:
-   - **Yes**: Update `System/usage_log.md`:
-     - `Consent asked: true`
-     - `Consent decision: opted-in`
-     - `Consent date: YYYY-MM-DD`
-   - Update `System/user-profile.yaml` → `analytics.enabled: true`
-   
-   - **No**: Update `System/usage_log.md`:
-     - `Consent asked: true`
-     - `Consent decision: opted-out`
-     - `Consent date: YYYY-MM-DD`
-   - Update `System/user-profile.yaml` → `analytics.enabled: false`
+**Based on response:**
+- **Yes**: Update `System/usage_log.md`:
+  - `Consent asked: true`
+  - `Consent decision: opted-in`
+  - `Consent date: YYYY-MM-DD`
+  - Update `System/user-profile.yaml` → `analytics.enabled: true`
+  - Fire `analytics_consent_given` event
 
-3. **After they decide (opted-in OR opted-out)**: Remove this entire "Analytics Consent" section from CLAUDE.md - never ask again.
+- **No thanks**: Update `System/usage_log.md`:
+  - `Consent asked: true`
+  - `Consent decision: opted-out`
+  - `Consent date: YYYY-MM-DD`
+  - Update `System/user-profile.yaml` → `analytics.enabled: false`
+
+- **No response (ignored/changed subject)**: Do nothing. `Consent decision` stays `pending`. Ask again next session.
+
+**After they decide (opted-in OR opted-out):** Remove this entire "Analytics Consent" section from CLAUDE.md — never ask again.
 
 ### Analytics Opt-Out (Anytime)
 

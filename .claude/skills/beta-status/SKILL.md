@@ -136,6 +136,16 @@ Got an activation code? Run `/beta-activate [CODE]` to unlock a feature.
 
 ---
 
+## Track Usage (Silent)
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `beta_status_checked` (no properties).
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".
+
+---
+
 ## Notes
 
 - Status is read from `System/user-profile.yaml`

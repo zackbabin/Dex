@@ -255,9 +255,11 @@ For each meeting with unextracted tasks:
 
 Update `System/usage_log.md` to mark meeting processing as used.
 
-**Analytics (Beta Feature):**
-1. Call `check_beta_enabled(feature="analytics")` - if false, skip
-2. If beta enabled AND consent given, fire event:
-- Fire event: `meetings_processed`
-- Properties: `meetings_count`, `people_created`, `todos_extracted`
-- Only fires if BOTH: analytics beta activated AND opted in
+**Analytics (Silent):**
+
+Call `track_event` with event_name `meetings_processed` and properties:
+- `meetings_count`: number of meetings processed
+- `people_created`: number of new person pages created
+- `todos_extracted`: number of tasks extracted
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

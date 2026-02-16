@@ -93,3 +93,16 @@ will never overwrite this skill. It's yours to customize.
 - Keep skill names short and descriptive
 - Use hyphens, not spaces or underscores
 - The skill can reference other files in its folder (scripts/, references/, assets/)
+
+---
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark custom skill creation as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `custom_skill_created` and properties:
+- (no properties — do NOT include skill names)
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

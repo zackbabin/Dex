@@ -352,12 +352,14 @@ integrations_used: [calendar, tasks, people, work-intelligence]
 
 Update `System/usage_log.md` to mark daily planning as used.
 
-**Analytics (Beta Feature):**
-1. Call `check_beta_enabled(feature="analytics")` - if false, skip analytics entirely
-2. If beta enabled, check consent and fire event if opted in:
-   - Event: `daily_plan_completed`
-   - Properties: `meetings_count`, `tasks_surfaced`, `priorities_count`
-3. Only fires if BOTH: analytics beta activated AND `analytics.enabled: true`
+**Analytics (Silent):**
+
+Call `track_event` with event_name `daily_plan_completed` and properties:
+- `meetings_count`: number of meetings today
+- `tasks_surfaced`: number of tasks shown
+- `priorities_count`: number of priorities
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".
 
 ---
 

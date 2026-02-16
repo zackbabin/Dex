@@ -389,3 +389,15 @@ If real commitments aren't detected:
 - `/daily-review` - Integrates commitment check
 - `/week-review` - Shows commitment health stats
 - ScreenPipe Setup Guide - `06-Resources/Dex_System/ScreenPipe_Setup.md`
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark commitment scan as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `commitment_scan_completed` and properties:
+- `commitments_found`
+- `tasks_created`
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

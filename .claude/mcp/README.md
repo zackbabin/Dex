@@ -1,105 +1,34 @@
-# MCP: From Helpful to Reliable
+# MCP Configurations
 
-**Purpose:** Model Context Protocol (MCP) servers that transform Dex from "mostly works" to "always works" - guaranteed operations, automatic syncing, and deterministic behavior.
-
-**The key insight:** AI is probabilistic by nature. Ask it to do a 5-step task where each step is 85% accurate? Overall success is 0.85^5 = 44%. Less than a coin flip.
-
-**MCP solves this.** Instead of Claude improvising, MCP servers provide guaranteed operations with validation and error handling. Same input, same reliable output. Every time.
+**Purpose:** Model Context Protocol (MCP) server configurations that connect external tools and data sources to Dex.
 
 ---
 
-## The Transformation: Probabilistic to Deterministic
+## What Is MCP?
+
+**MCP (Model Context Protocol)** is how Claude connects to your external tools and data. It's like giving Claude the ability to check your calendar, read your meeting transcripts, or create tasks — reliably and consistently.
+
+### Why It Matters
+
+Without MCP, Claude would have to guess how to interact with your systems. With MCP, Claude uses proper connections that work the same way every time.
+
+**Think of it like this:**
 
 **Without MCP:**
 - You: "Create a task to follow up with John"
-- Claude: *Guesses format, hopes for the best*
-- Result: Maybe correct, maybe duplicates, maybe wrong file, maybe breaks task sync
+- Claude: "I'll write it to 03-Tasks/Tasks.md... maybe this format? Should I check for duplicates? Where should it go?"
+- Result: Inconsistent, might miss important details
 
-If you ask Claude to create 10 tasks and each has 85% accuracy? Only ~20% chance all 10 are correct. The system isn't reliable enough to trust.
-
-**With MCP (Work server):**
+**With MCP (using the Work server):**
 - You: "Create a task to follow up with John"  
-- Claude: Calls `create_task` tool with proper validation
-- Result: Task created with unique ID, deduplication checked, synced everywhere automatically
+- Claude: Uses the proper `create_task` tool
+- Result: Task created with unique ID, synced everywhere, proper format, duplicate detection
 
-Ask it to create 100 tasks? All 100 work correctly. The system is reliable enough to build on.
-
-**This is the difference between helpful assistant and operating system.**
-
----
-
-## The Two MCPs That Transform Dex
-
-### Work MCP: Task Sync That Actually Works
-
-**The problem MCP solves:** Traditional systems can't sync tasks across multiple files. Check off a task in your meeting note, but it stays open in Tasks.md and person pages. They get out of sync.
-
-**What Work MCP does:**
-- ✅ Assigns unique IDs to every task (`^task-20260128-001`)
-- ✅ Syncs status across ALL locations (meeting notes, Tasks.md, person pages, project files)
-- ✅ Detects duplicates before creating them
-- ✅ Enforces priority limits (won't let you overcommit)
-- ✅ Validates strategic alignment (every task tagged to a pillar)
-
-**In practice:**
-```
-You: "Mark the proposal task done"
-Work MCP:
-  → Finds task ID via fuzzy match
-  → Updates Tasks.md
-  → Updates meeting note where it was created
-  → Updates Sarah's person page
-  → Timestamps: ✅2026-01-28 14:35
-```
-
-Check off once, updates everywhere. No manual syncing. No duplicates getting out of sync. One source of truth.
-
-**This is why Python installation is required** - the Work MCP server is the automation engine that makes task management reliable.
-
-### Career MCP: Progression You Can Actually Track
-
-**The problem MCP solves:** Career progression evidence disappears. Six months later you're reconstructing achievements from fragmented memory. Performance reviews become stressful scrambles.
-
-**What Career MCP does:**
-- ✅ Captures evidence automatically (achievements, feedback, skills demonstrated)
-- ✅ Maps work to career ladder requirements
-- ✅ Tracks promotion readiness with gap analysis
-- ✅ Generates reviews from accumulated evidence, not reconstructed memory
-- ✅ Links daily work to career goals bidirectionally
-
-**In practice:**
-```
-You: Run /daily-review
-Career MCP:
-  → Detects: "Led migration to new payment system"
-  → Maps to career ladder: "System Design" + "Technical Leadership"
-  → Tags evidence with next-level requirements
-  → Files to career folder automatically
-
-Later:
-You: "Generate my self-review"
-Career MCP:
-  → Pulls 6 months of accumulated evidence
-  → Organizes by competency
-  → Shows progression narrative
-  → Review ready in 30 seconds
-```
-
-**The integration that matters:** Career MCP and Work MCP work bidirectionally. Daily work feeds up (evidence, skills, gaps). Career goals push down (tasks tagged to development areas, quarters aligned to promotion criteria).
-
-Everything compounds toward progression.
-
----
-
-## Other Included MCPs
-
-| MCP | What It Does | Why It Matters |
-|-----|--------------|----------------|
-| **Calendar** | Read Apple Calendar events, detect conflicts | Meeting prep knows your day, never books over existing meetings |
-| **Granola** | Process meeting transcripts into structured notes | Meeting intelligence without manual note-taking |
-| **Onboarding** | Stateful setup with validation and resume | Guided role-based setup that adapts to your answers |
-| **Update Checker** | GitHub release detection for `/dex-update` | System stays current without manual checking |
-| **Resume Builder** | Stateful resume creation with validation | Build resume through guided conversation, not blank page |
+**What you get:**
+- ✅ Same format every time
+- ✅ No duplicates
+- ✅ Automatic syncing (task appears in meeting notes, 03-Tasks/Tasks.md, person pages)
+- ✅ Reliable behavior
 
 **Learn more:** [Anthropic's MCP Documentation](https://docs.anthropic.com/en/docs/build-with-claude/mcp)
 

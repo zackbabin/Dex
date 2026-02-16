@@ -79,6 +79,26 @@
       "env": {
         "VAULT_PATH": "{{VAULT_PATH}}"
       }
+    },
+    "dex-analytics": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "{{VAULT_PATH}}/core/mcp/analytics_server.py"
+      ],
+      "env": {
+        "VAULT_PATH": "{{VAULT_PATH}}"
+      }
+    },
+    "session-memory": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "{{VAULT_PATH}}/core/mcp/session_memory_server.py"
+      ],
+      "env": {
+        "VAULT_PATH": "{{VAULT_PATH}}"
+      }
     }
   }
 }

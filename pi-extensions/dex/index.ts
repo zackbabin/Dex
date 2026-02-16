@@ -21,8 +21,9 @@ import { Type, type Static } from "@sinclair/typebox";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { Text, Container, Markdown } from "@mariozechner/pi-tui";
 import { registerOrchestratorTools } from "./orchestrator.js";
-import { registerCommitmentDetector } from "./commitment-detector.js";
+// DISABLED: import { registerCommitmentDetector } from "./commitment-detector.js";
 import { registerModelRouter } from "./model-router.js";
+import { registerRitualCommandBar } from "./ritual-command-bar.js";
 
 const execAsync = promisify(exec);
 
@@ -954,7 +955,16 @@ export default function (pi: ExtensionAPI) {
         };
         
         ctx.ui.setWidget("dex-dashboard", (_tui, _theme) => ({
-          render: (width) => dashboard.renderDashboard(dashboardData, width),
+          render: (width) => {
+            try {
+              return dashboard.renderDashboard(dashboardData, width);
+            } catch (error) {
+              // Fallback: disable widget if render fails
+              ctx.ui.setWidget("dex-dashboard", undefined);
+              console.error("[Dex] Dashboard render error:", error);
+              return [];
+            }
+          },
           invalidate: () => {},
         }), { placement: "belowEditor" });
         
@@ -1431,7 +1441,16 @@ export default function (pi: ExtensionAPI) {
         };
         
         ctx.ui.setWidget("dex-dashboard", (_tui, _theme) => ({
-          render: (width) => dashboard.renderDashboard(dashboardData, width),
+          render: (width) => {
+            try {
+              return dashboard.renderDashboard(dashboardData, width);
+            } catch (error) {
+              // Fallback: disable widget if render fails
+              ctx.ui.setWidget("dex-dashboard", undefined);
+              console.error("[Dex] Dashboard render error:", error);
+              return [];
+            }
+          },
           invalidate: () => {},
         }), { placement: "belowEditor" });
         
@@ -1458,14 +1477,20 @@ export default function (pi: ExtensionAPI) {
   registerOrchestratorTools(pi);
   
   // =========================================================================
-  // REGISTER COMMITMENT DETECTOR (Ambient Intelligence)
+  // REGISTER COMMITMENT DETECTOR (Ambient Intelligence) - DISABLED
   // =========================================================================
   
-  registerCommitmentDetector(pi);
+  // registerCommitmentDetector(pi);
   
   // =========================================================================
   // REGISTER MODEL ROUTER (Smart Model Selection)
   // =========================================================================
-  
+
   registerModelRouter(pi);
+
+  // =========================================================================
+  // REGISTER RITUAL COMMAND BAR (Contextual Ritual Guidance)
+  // =========================================================================
+
+  registerRitualCommandBar(pi);
 }

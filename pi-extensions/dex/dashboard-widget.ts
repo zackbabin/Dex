@@ -1,8 +1,10 @@
 /**
  * Dashboard Widget
- * 
+ *
  * Shows your day at a glance: week priorities, top tasks, focus time
  */
+
+import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 
 export interface WeekPriority {
   text: string;
@@ -25,23 +27,41 @@ export interface DashboardData {
  */
 export function renderDashboard(data: DashboardData, width: number): string[] {
   const lines: string[] = [];
+  const innerWidth = Math.max(0, width - 2);
+  const leftColWidth = 27;
+  const gapWidth = 2;
+  const rightColWidth = Math.max(0, innerWidth - 2 - leftColWidth - gapWidth);
+
+  const fitColumn = (text: string, colWidth: number, ellipsis = ""): string => {
+    const truncated = truncateToWidth(text, colWidth, ellipsis);
+    const padding = Math.max(0, colWidth - visibleWidth(truncated));
+    return truncated + " ".repeat(padding);
+  };
+
+  const makeLine = (content: string): string => {
+    const safe = fitColumn(content, innerWidth);
+    return `│${safe}│`;
+  };
+
+  const makeTwoColLine = (left: string, right: string, ellipsis = "..."): string => {
+    const leftCell = fitColumn(left, leftColWidth, ellipsis);
+    const rightCell = fitColumn(right, rightColWidth, ellipsis);
+    return makeLine(`  ${leftCell}${" ".repeat(gapWidth)}${rightCell}`);
+  };
   
   // Top border
-  lines.push("┌─ Your Day at a Glance " + "─".repeat(Math.max(0, width - 26)) + "┐");
-  lines.push("│" + " ".repeat(width - 2) + "│");
+  lines.push(`┌${"─".repeat(innerWidth)}┐`);
+  lines.push(makeLine(""));
   
   // Column headers
   const leftHeader = "Week Priorities";
   const rightHeader = "Top Tasks";
-  const headerGap = Math.floor((width - leftHeader.length - rightHeader.length - 4) / 2);
-  const header = `│  ${leftHeader}${" ".repeat(headerGap)}${rightHeader}${" ".repeat(Math.max(0, width - 4 - leftHeader.length - headerGap - rightHeader.length))}│`;
-  lines.push(header);
+  lines.push(makeTwoColLine(leftHeader, rightHeader, ""));
   
   // Underlines
   const leftUnderline = "─".repeat(leftHeader.length);
   const rightUnderline = "─".repeat(rightHeader.length);
-  const underline = `│  ${leftUnderline}${" ".repeat(headerGap)}${rightUnderline}${" ".repeat(Math.max(0, width - 4 - leftUnderline.length - headerGap - rightUnderline.length))}│`;
-  lines.push(underline);
+  lines.push(makeTwoColLine(leftUnderline, rightUnderline, ""));
   
   // Data rows (up to 3)
   const maxRows = 3;
@@ -50,30 +70,27 @@ export function renderDashboard(data: DashboardData, width: number): string[] {
     const rightItem = data.topTasks[i];
     
     const leftText = leftItem
-      ? `${leftItem.completed ? "☑" : "□"} ${truncate(leftItem.text, 25)}`
+      ? `${leftItem.completed ? "☑" : "□"} ${leftItem.text}`
       : "";
     const rightText = rightItem
-      ? `${getPriorityIcon(rightItem.priority)} ${truncate(rightItem.text, 30)}`
+      ? `${getPriorityIcon(rightItem.priority)} ${rightItem.text}`
       : "";
-    
-    const leftPadded = leftText.padEnd(27); // Fixed width for left column
-    const gap = " ".repeat(Math.max(0, headerGap - 2));
-    const row = `│  ${leftPadded}${gap}${rightText}${" ".repeat(Math.max(0, width - 4 - leftPadded.length - gap.length - rightText.length))}│`;
-    lines.push(row);
+
+    lines.push(makeTwoColLine(leftText, rightText, "..."));
   }
   
   // Empty line
-  lines.push("│" + " ".repeat(width - 2) + "│");
+  lines.push(makeLine(""));
   
   // Focus time
   const focusText = `📅 Focus Time Available: ${formatHours(data.focusHoursAvailable)}`;
-  lines.push(`│  ${focusText}${" ".repeat(Math.max(0, width - 4 - focusText.length))}│`);
+  lines.push(makeLine(`  ${focusText}`));
   
   // Empty line
-  lines.push("│" + " ".repeat(width - 2) + "│");
+  lines.push(makeLine(""));
   
   // Bottom border
-  lines.push("└" + "─".repeat(width - 2) + "┘");
+  lines.push(`└${"─".repeat(innerWidth)}┘`);
   
   return lines;
 }
@@ -90,14 +107,6 @@ function getPriorityIcon(priority: "P0" | "P1" | "P2"): string {
     case "P2":
       return "○";
   }
-}
-
-/**
- * Truncate text to max length
- */
-function truncate(text: string, maxLen: number): string {
-  if (text.length <= maxLen) return text;
-  return text.slice(0, maxLen - 3) + "...";
 }
 
 /**

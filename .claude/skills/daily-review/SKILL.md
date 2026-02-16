@@ -331,7 +331,15 @@ At the end of the review, check if there's a relevant backlog idea to surface:
 
 ## Step 10: Track Usage (Silent)
 
-Update `System/usage_log.md`.
+Update `System/usage_log.md` to mark daily review as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `daily_review_completed` and properties:
+- `wins_count`
+- `learnings_count`
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".
 
 ---
 

@@ -28,6 +28,15 @@ from mcp.server.models import InitializationOptions
 import mcp.server.stdio
 import mcp.types as types
 
+# Analytics helper (optional - gracefully degrade if not available)
+try:
+    from analytics_helper import fire_event as _fire_analytics_event
+    HAS_ANALYTICS = True
+except ImportError:
+    HAS_ANALYTICS = False
+    def _fire_analytics_event(event_name, properties=None):
+        return {'fired': False, 'reason': 'analytics_not_available'}
+
 # Granola paths (cross-platform)
 def get_granola_cache_path():
     """Get Granola cache path for current OS"""
@@ -76,6 +85,15 @@ GRANOLA_CREDS = get_granola_creds_path()
 
 # Vault paths
 VAULT_PATH = Path(os.environ.get('VAULT_PATH', Path.cwd()))
+
+# Health system — error queue and health reporting
+try:
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from core.utils.dex_logger import log_error as _log_health_error, mark_healthy as _mark_healthy
+    _HAS_HEALTH = True
+except ImportError:
+    _HAS_HEALTH = False
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -811,9 +829,21 @@ async def handle_call_tool(
     name: str, arguments: dict | None
 ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
     """Handle tool calls"""
-    
+    try:
+        return await _handle_call_tool_inner(name, arguments)
+    except Exception as e:
+        if _HAS_HEALTH:
+            _log_health_error("granola-mcp", str(e), context={"tool": name})
+        raise
+
+
+async def _handle_call_tool_inner(
+    name: str, arguments: dict | None
+) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+    """Inner tool handler — wrapped by handle_call_tool for health reporting."""
+
     arguments = arguments or {}
-    
+
     if name == "granola_check_available":
         # Check API availability
         api_available = False
@@ -911,6 +941,11 @@ async def handle_call_tool(
             "data_source": meeting.get('source', 'unknown')
         }
         
+        try:
+            _fire_analytics_event('granola_meeting_viewed')
+        except Exception:
+            pass
+        
         return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
     elif name == "granola_search_meetings":
@@ -934,6 +969,11 @@ async def handle_call_tool(
             "count": len(meetings),
             "data_source": meetings[0].get('source', 'unknown') if meetings else 'none'
         }
+        
+        try:
+            _fire_analytics_event('granola_meetings_searched')
+        except Exception:
+            pass
         
         return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
@@ -1070,6 +1110,8 @@ async def handle_call_tool(
 
 async def _main():
     """Async main entry point for the MCP server"""
+    if _HAS_HEALTH:
+        _mark_healthy("granola-mcp")
     logger.info("Starting Dex Granola MCP Server (API-first with cache fallback)")
     logger.info(f"API credentials: {GRANOLA_CREDS}")
     logger.info(f"Cache fallback: {GRANOLA_CACHE}")

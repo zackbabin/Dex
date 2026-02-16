@@ -656,3 +656,16 @@ After completion, verify:
 
 See `.claude/reference/skill-analytics-checklist.md` for detailed guidance.
 - [ ] User knows how to configure Claude to use the server
+
+---
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark MCP creation as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `mcp_created` and properties:
+- (no properties — do NOT include service names)
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

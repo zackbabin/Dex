@@ -7,6 +7,7 @@
 import { Container, Text, Spacer, truncateToWidth } from "@mariozechner/pi-tui";
 import { renderProgressBar, type ProgressBarTheme } from "./progress-bar.js";
 import type { Theme } from "@mariozechner/pi-coding-agent";
+import { validateLineWidth, getVisibleWidth as utilGetVisibleWidth, renderTopBorder } from "./tui-validation.js";
 
 export interface ScoutProgress {
   name: string;
@@ -105,37 +106,44 @@ export class ProgressIndicator {
 
     const lines: string[] = [];
 
-    // Top border
-    lines.push(this.theme.fg("border", "┌─ " + this.options.title + " " + "─".repeat(Math.max(0, width - this.options.title.length - 4)) + "┐"));
+    // Top border - Using validated utility
+    const title = truncateToWidth(this.options.title, Math.max(0, width - 6));
+    const topBorderLine = renderTopBorder(title, width, (s) => this.theme.fg("border", s));
+    validateLineWidth(topBorderLine, width, "ProgressIndicator", "top border");
+    lines.push(topBorderLine);
 
     // Empty line
-    lines.push(this.theme.fg("border", "│") + " ".repeat(width - 2) + this.theme.fg("border", "│"));
+    const emptyLine = this.theme.fg("border", truncateToWidth(`│${" ".repeat(Math.max(0, width - 2))}│`, width));
+    validateLineWidth(emptyLine, width, "ProgressIndicator", "empty line");
+    lines.push(emptyLine);
 
     // Status message
     const statusMsg = this.getStatusMessage();
-    lines.push(this.theme.fg("border", "│") + "  " + truncateToWidth(statusMsg, width - 4) + " ".repeat(Math.max(0, width - 4 - statusMsg.length)) + this.theme.fg("border", "│"));
+    lines.push(this.formatLine(statusMsg, width));
 
     // Empty line
-    lines.push(this.theme.fg("border", "│") + " ".repeat(width - 2) + this.theme.fg("border", "│"));
+    lines.push(emptyLine);
 
     // Scout progress bars
     for (const scout of this.scouts.values()) {
-      const line = this.renderScoutLine(scout, width);
-      lines.push(this.theme.fg("border", "│") + "  " + line + " ".repeat(Math.max(0, width - 4 - this.getVisibleWidth(line))) + this.theme.fg("border", "│"));
+      const line = this.renderScoutLine(scout, Math.max(0, width - 4));
+      lines.push(this.formatLine(line, width));
     }
 
     // Empty line
-    lines.push(this.theme.fg("border", "│") + " ".repeat(width - 2) + this.theme.fg("border", "│"));
+    lines.push(emptyLine);
 
     // Summary line if showing estimate
     if (this.options.showEstimate && this.completedCount > 0) {
       const summary = this.getSummaryLine();
-      lines.push(this.theme.fg("border", "│") + "  " + truncateToWidth(summary, width - 4) + " ".repeat(Math.max(0, width - 4 - summary.length)) + this.theme.fg("border", "│"));
-      lines.push(this.theme.fg("border", "│") + " ".repeat(width - 2) + this.theme.fg("border", "│"));
+      lines.push(this.formatLine(summary, width));
+      lines.push(emptyLine);
     }
 
     // Bottom border
-    lines.push(this.theme.fg("border", "└" + "─".repeat(width - 2) + "┘"));
+    const bottomBorder = this.theme.fg("border", truncateToWidth(`└${"─".repeat(Math.max(0, width - 2))}┘`, width));
+    validateLineWidth(bottomBorder, width, "ProgressIndicator", "bottom border");
+    lines.push(bottomBorder);
 
     this.cachedWidth = width;
     this.cachedLines = lines;
@@ -166,7 +174,8 @@ export class ProgressIndicator {
     const bar = renderProgressBar(scout.progress, barWidth, progressBarTheme);
     const statusText = this.getStatusText(scout);
 
-    return `${statusIcon} ${truncateToWidth(scout.name, 20).padEnd(20)} [${bar}] ${statusText}`;
+    const line = `${statusIcon} ${truncateToWidth(scout.name, 20).padEnd(20)} [${bar}] ${statusText}`;
+    return truncateToWidth(line, width);
   }
 
   private getStatusIcon(status: ScoutProgress["status"]): string {
@@ -234,6 +243,22 @@ export class ProgressIndicator {
     // Simple ANSI stripping for width calculation
     // eslint-disable-next-line no-control-regex
     return str.replace(/\x1b\[[0-9;]*m/g, "").length;
+  }
+
+  private formatLine(content: string, width: number): string {
+    const innerWidth = Math.max(0, width - 4);
+    const truncated = truncateToWidth(content, innerWidth);
+    const padding = Math.max(0, innerWidth - this.getVisibleWidth(truncated));
+    const line = this.theme.fg("border", "│") +
+      "  " +
+      truncated +
+      " ".repeat(padding) +
+      this.theme.fg("border", "│");
+    const finalLine = truncateToWidth(line, width);
+    
+    // Validate this line using utility
+    validateLineWidth(finalLine, width, "ProgressIndicator", "content line");
+    return finalLine;
   }
 
   invalidate(): void {

@@ -1,0 +1,58 @@
+# Strategic Pillars Configuration
+#
+# Pillars are your main focus areas — think of them as how you carve up your role thematically.
+# These are NOT time-bound (like quarterly goals). They represent ongoing areas of responsibility
+# that typically stay consistent for 6-12+ months, or until your role significantly changes.
+#
+# PILLAR (ongoing):           GOAL (time-bound):
+# "Revenue Growth"      vs    "Hit 150% quota in Q1"
+# "Product Strategy"    vs    "Launch mobile app"
+# "Customer Retention"  vs    "Reduce churn to <2%"
+#
+# Want to change your pillars? Just chat with Claude: "I need to reconfigure my strategic pillars"
+# — it'll help you update how your work ladders up to new focus areas.
+#
+# The Work MCP uses these to categorize tasks and check balance across your work.
+
+# Example pillars for a Product Manager:
+pillars:
+  - id: product_strategy
+    name: "Product Strategy"
+    description: "Product roadmap, feature prioritization, market positioning"
+    keywords:
+      - roadmap
+      - feature
+      - strategy
+      - product vision
+      - competitive analysis
+      - positioning
+
+  - id: customer_insights
+    name: "Customer Insights"
+    description: "User research, feedback loops, customer development"
+    keywords:
+      - customer
+      - user
+      - feedback
+      - research
+      - interview
+      - insights
+      - voice of customer
+
+  - id: team_collaboration
+    name: "Team Collaboration"
+    description: "Cross-functional work with engineering, design, marketing"
+    keywords:
+      - engineering
+      - design
+      - marketing
+      - collaboration
+      - alignment
+      - cross-functional
+      - stakeholder
+
+# Priority limits (how many active tasks per priority level)
+priority_limits:
+  P0: 3   # Critical/urgent - max 3 at a time
+  P1: 5   # Important - max 5 at a time
+  P2: 10  # Normal - suggested limit

@@ -58,3 +58,16 @@ claude mcp add --scope project github --transport http https://api.githubcopilot
 - If you are not sure, **use user scope**.
 - Only use project scope if **everyone** should get the server.
 - Do not add personal MCPs to `.mcp.json`.
+
+---
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark MCP addition as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `mcp_added` and properties:
+- (no properties — do NOT include server names)
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

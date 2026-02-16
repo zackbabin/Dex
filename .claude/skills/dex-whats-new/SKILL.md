@@ -414,3 +414,14 @@ Then proceed with first-run behavior.
 
 - `/dex-improve` — Full design partner (includes this + workshopping + audit)
 - `/create-mcp` — Build new integrations when new MCP features enable them
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark what's new check as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `whats_new_viewed` and properties:
+- `update_available` (boolean)
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

@@ -193,3 +193,13 @@ If user wants maximum privacy (nothing to Anthropic):
 2. Choose Offline/Local mode (Ollama)
 3. Then set up ScreenPipe
 4. "With local models, your screen data never leaves your machine - even when you ask me questions about it."
+
+## Track Usage (Silent)
+
+Update `System/usage_log.md` to mark ScreenPipe setup as used.
+
+**Analytics (Silent):**
+
+Call `track_event` with event_name `screenpipe_setup_completed` (no properties).
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

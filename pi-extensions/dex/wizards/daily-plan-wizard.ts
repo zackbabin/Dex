@@ -9,6 +9,7 @@ import { ProgressIndicator, type ScoutProgress } from "../ui/progress-indicator.
 import { WeekProgressBar, type WeekProgress } from "../ui/week-progress.js";
 import { CollapsibleSection } from "../ui/collapsible-section.js";
 import type { Theme } from "@mariozechner/pi-coding-agent";
+import { validateLineWidth, getVisibleWidth, calculateBorderFill } from "../ui/tui-validation.js";
 
 export interface CalendarEvent {
   title: string;
@@ -124,9 +125,13 @@ export class DailyPlanWizard {
 
     const container = new Container();
 
-    // Title
+    // Title - Fixed: use actual visible width, not hardcoded value
     const title = this.theme.fg("accent", this.theme.bold("Daily Plan Wizard"));
-    container.addChild(new Text("┌─ " + title + " " + "─".repeat(Math.max(0, width - 22)) + "┐", 0, 0));
+    const titleWidth = getVisibleWidth(title);
+    const borderFill = calculateBorderFill(width, titleWidth);
+    const topBorder = "┌─ " + title + " " + "─".repeat(borderFill) + "┐";
+    validateLineWidth(topBorder, width, "DailyPlanWizard", "top border");
+    container.addChild(new Text(topBorder, 0, 0));
     container.addChild(new Text("│" + " ".repeat(width - 2) + "│", 0, 0));
 
     if (this.state === "loading") {
@@ -137,8 +142,10 @@ export class DailyPlanWizard {
       this.renderReadyState(container, width);
     }
 
-    // Bottom border
-    container.addChild(new Text("└" + "─".repeat(width - 2) + "┘", 0, 0));
+    // Bottom border - Add validation
+    const bottomBorder = "└" + "─".repeat(width - 2) + "┘";
+    validateLineWidth(bottomBorder, width, "DailyPlanWizard", "bottom border");
+    container.addChild(new Text(bottomBorder, 0, 0));
 
     this.cachedWidth = width;
     this.cachedLines = container.render(width);

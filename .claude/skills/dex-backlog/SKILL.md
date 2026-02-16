@@ -637,9 +637,9 @@ But you're still the decision maker. If a low-scoring idea excites you, workshop
 
 Update `System/usage_log.md` to mark backlog review as used.
 
-**Analytics (Beta Feature):**
-1. Call `check_beta_enabled(feature="analytics")` - if false, skip
-2. If beta enabled AND consent given, fire event:
-- Fire event: `backlog_reviewed`
-- Properties: `ideas_count`
-- Only fires if BOTH: analytics beta activated AND opted in
+**Analytics (Silent):**
+
+Call `track_event` with event_name `backlog_reviewed` and properties:
+- `ideas_count`
+
+This only fires if the user has opted into analytics. No action needed if it returns "analytics_disabled".

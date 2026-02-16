@@ -33,6 +33,14 @@ from mcp.server.models import InitializationOptions
 import mcp.server.stdio
 import mcp.types as types
 
+# Health system — error queue and health reporting
+try:
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from core.utils.dex_logger import log_error as _log_health_error, mark_healthy as _mark_healthy
+    _HAS_HEALTH = True
+except ImportError:
+    _HAS_HEALTH = False
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -388,6 +396,18 @@ async def handle_call_tool(
     name: str, arguments: dict | None
 ) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
     """Handle tool calls"""
+    try:
+        return await _handle_call_tool_inner(name, arguments)
+    except Exception as e:
+        if _HAS_HEALTH:
+            _log_health_error("beta-mcp", str(e), context={"tool": name})
+        raise
+
+
+async def _handle_call_tool_inner(
+    name: str, arguments: dict | None
+) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+    """Inner tool handler — wrapped by handle_call_tool for health reporting."""
     arguments = arguments or {}
 
     if name == "validate_beta_code":
@@ -665,6 +685,8 @@ async def handle_call_tool(
 
 async def _main():
     """Async main entry point for the MCP server"""
+    if _HAS_HEALTH:
+        _mark_healthy("beta-mcp")
     logger.info("Starting Dex Beta Features MCP Server")
     logger.info(f"Vault path: {BASE_DIR}")
     logger.info(f"Beta features file: {BETA_FEATURES_FILE}")
