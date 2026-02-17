@@ -7,6 +7,32 @@ All notable changes to Dex will be documented in this file.
 
 ---
 
+## [1.10.0] - 2026-02-17
+
+### 🩺 Dex Now Tells You When Something's Wrong
+
+**Before:** When something failed — your calendar couldn't connect, a task couldn't be created, meeting processing hit an error — you'd get a vague message in the conversation and then... nothing. The error disappeared when the chat ended. If something was quietly broken for days, you wouldn't know until you needed it and wondered why it stopped working.
+
+**Now:** Dex watches its own health. Every tool across all 12 background services captures failures the moment they happen — in plain language, not technical jargon. The next time you start a conversation, you'll see anything that went wrong:
+
+```
+--- ⚠️ Recent Errors (2) ---
+  [Task Manager] Feb 17 09:30 — Task creation failed (×3)
+  [Calendar] Feb 16 14:00 — Calendar couldn't connect
+Say: 'health check' to investigate
+---
+```
+
+If everything is fine? Complete silence. No "all systems go" noise.
+
+**Say `/health-check` anytime** to get a full diagnostic: which services are running, what's failed recently, and — for most issues — a suggested fix. Missing something? It tells you the exact command. Config issue? It offers to repair it.
+
+**What this means for you:** Instead of discovering something's been broken for a week, you find out at your next conversation. Instead of a cryptic error, you get "Calendar couldn't connect" with a clear next step. Dex is becoming the kind of system that takes care of itself — and tells you when it needs your help.
+
+**Platform note:** Automatic startup checks work in Claude Code. In Cursor, the error capture still works behind the scenes — just run `/health-check` manually to see the same diagnostic.
+
+---
+
 ## [1.9.1] - 2026-02-17
 
 ### Automatic Update Notifications
