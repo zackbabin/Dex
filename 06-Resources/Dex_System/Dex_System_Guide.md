@@ -882,6 +882,11 @@ Dex includes seven custom MCP servers in `core/mcp/`:
 | MCP Server | What It Does | Setup |
 |------------|--------------|-------|
 | **Pendo** (hosted) | Product analytics for Pendo customers - guide performance, feature adoption, engagement tracking | OAuth via Pendo. Enable in onboarding or add to AI client config. Details: https://support.pendo.io/hc/en-us/articles/41102236924955 |
+| **Figma** (hosted) | Access Figma designs, screenshots, variables, and component metadata for design-to-code workflows | OAuth via Figma (browser sign-in). Add `"type": "http", "url": "https://mcp.figma.com/mcp"` to `.mcp.json` |
+| **Alpha Vantage** (hosted) | Stock market data, company fundamentals, technical indicators, options, forex, crypto, commodities, economic data | Free API key from https://www.alphavantage.co/support/#api-key (25 req/day). Add as HTTP MCP to `.mcp.json` |
+| **Linear** | Issue tracking - projects, cycles, issues, comments, milestones | Remote MCP via `mcp-remote`. OAuth on first use |
+| **Mixpanel** | Product analytics - segmentation, funnels, retention, reports | Remote MCP via `mcp-remote`. OAuth on first use |
+| **Supabase** | Database access - SQL queries, migrations, edge functions, type generation | `@supabase/mcp-server-supabase` npm package. Requires project URL + service role key |
 
 ### Calendar MCP Tools
 

@@ -401,6 +401,63 @@ If interrupted, calling `start_onboarding_session()` resumes from the last compl
 
 **Documentation:** https://support.pendo.io/hc/en-us/articles/41102236924955
 
+#### Figma (Design Context)
+
+**Type:** Official Figma remote MCP server (hosted by Figma)
+
+**Purpose:** Access Figma designs, screenshots, variables, and component metadata. Enables design-to-code workflows and design review without leaving the editor.
+
+**Setup:**
+```json
+{
+  "figma": {
+    "type": "http",
+    "url": "https://mcp.figma.com/mcp"
+  }
+}
+```
+
+Authenticate via OAuth (browser sign-in on first use). Works on all Figma plans.
+
+**Key tools:**
+- `get_screenshot` - Screenshot a Figma frame by URL
+- `get_design_context` - Extract design variables, components, styles
+- `get_metadata` - File and node metadata
+- `get_figjam` - Access FigJam diagrams
+- `get_code_connect_map` / `add_code_connect_map` - Link design components to code
+
+**How it's used:** Paste a Figma frame URL into a prompt and Claude extracts the `node-id` to fetch design data. Useful during product development for referencing mockups, extracting design tokens, and verifying implementations against designs.
+
+#### Alpha Vantage (Stock Market Data)
+
+**Type:** Official Alpha Vantage remote MCP server (hosted by Alpha Vantage)
+
+**Purpose:** Real-time and historical financial data across stocks, options, forex, crypto, commodities, and economics. 100+ tools for market research, competitive analysis, and financial context.
+
+**Setup:**
+```json
+{
+  "alphavantage": {
+    "type": "http",
+    "url": "https://mcp.alphavantage.co/mcp?apikey=YOUR_API_KEY"
+  }
+}
+```
+
+Free API key from https://www.alphavantage.co/support/#api-key (25 requests/day free tier).
+
+**Key tool categories:**
+- **Stock data** - Intraday, daily, weekly, monthly time series
+- **Fundamentals** - Company overviews, income statements, balance sheets, earnings
+- **Technical indicators** - RSI, MACD, Bollinger Bands, 50+ indicators
+- **Options** - Real-time options chains with Greeks
+- **Forex & crypto** - Currency pairs, digital currency data
+- **Commodities** - Oil, natural gas, precious metals
+- **Economic data** - GDP, inflation, unemployment, treasury yields
+- **Intelligence** - News sentiment, insider transactions
+
+**How it's used:** For competitive analysis (compare dub against public copy-trading competitors), market context during planning, and financial research. Can feed into Executive Summary dashboard when market context is relevant.
+
 ### MCP Development Pattern
 
 All Dex MCP servers follow this pattern:

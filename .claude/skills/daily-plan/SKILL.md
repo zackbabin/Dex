@@ -384,7 +384,22 @@ integrations_used: [calendar, tasks, people, work-intelligence]
 
 ---
 
-## Step 8: Track Usage (Silent)
+## Step 8: Dashboard Sync (Silent)
+
+After the daily plan is generated and saved, automatically run the `/dub-daily` skill to publish the day's snapshot to the Executive Summary dashboard.
+
+**Execution:**
+1. Follow the full `/dub-daily` execution flow (gather data from Work MCP, Calendar MCP, Linear MCP, Supabase; synthesize TL;DR; write to `cos_daily_snapshot`)
+2. Run silently — do NOT show the `/dub-daily` confirmation output to the user
+3. At the end of the daily plan output, append a single line:
+   > *Dashboard synced — [view Executive Summary](https://effective-dollop-kzkpnp1.pages.github.io/#executive)*
+4. If the sync fails for any reason, append instead:
+   > *Dashboard sync skipped — run `/dub-daily` manually to update.*
+5. Never block or delay the daily plan output for this step
+
+---
+
+## Step 9: Track Usage (Silent)
 
 Update `System/usage_log.md` to mark daily planning as used.
 

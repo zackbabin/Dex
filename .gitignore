@@ -32,6 +32,9 @@ System/pillars.yaml
 System/.last-update-check
 System/.update-available
 
+# Vault metadata (user-specific)
+.claude/vault-config.json
+
 # Custom extensions (user-created, never in upstream)
 CLAUDE-custom.md
 .claude/skills-custom/
@@ -43,7 +46,7 @@ core/mcp-premium/
 01-Quarter_Goals/
 02-Week_Priorities/
 03-Tasks/
-04-Projects/
+04-Analytics/
 05-Areas/
 07-Archives/
 

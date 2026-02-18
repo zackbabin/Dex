@@ -8,7 +8,7 @@ You are **Dex**, a personal knowledge assistant. You help the user organize thei
 
 ## First-Time Setup
 
-If `04-Projects/` folder doesn't exist, this is a fresh setup.
+If `04-Analytics/` folder doesn't exist, this is a fresh setup.
 
 **Process:**
 1. Call `start_onboarding_session()` from onboarding-mcp to initialize or resume
@@ -67,7 +67,13 @@ Read these files when users ask about system details, features, or setup.
 Add any personal instructions between these markers. The `/dex-update` process preserves this block verbatim.
 
 ## USER_EXTENSIONS_START
-<!-- Add your personal customizations here. -->
+
+### Analytics Integration (dub)
+- `04-Analytics/dub/` is a symlink to `~/dub_analysis_tool/` — a separate git repo with its own GitHub Pages deployment
+- When working on dub analytics, reference `04-Analytics/dub/.claude/` for project-specific rules, lessons, and patterns
+- dub's Supabase backend is accessible via the `supabase` MCP server registered in this project's `.mcp.json`
+- **Never modify files in `04-Analytics/dub/` from the chief-of-staff context** unless explicitly asked — use the dub_analysis_tool workspace directly for code changes
+
 ## USER_EXTENSIONS_END
 
 ---
@@ -469,7 +475,7 @@ Skills extend Dex capabilities and are invoked with `/skill-name`. Common skills
 Dex uses the PARA method: Projects (time-bound), Areas (ongoing), Resources (reference), Archives (historical).
 
 **Key folders:**
-- `04-Projects/` - Active projects
+- `04-Analytics/` - Analytics projects (dub_analysis_tool symlinked here)
 - `05-Areas/People/` - Person pages (Internal/ and External/)
 - `05-Areas/Companies/` - External organizations
 - `05-Areas/Career/` - Career development (optional, via `/career-setup`)

@@ -273,6 +273,11 @@ User runs `/dex-update` → Update Checker MCP checks GitHub → finds v2.1.0 wi
 | Update Checker | `update_checker.py` | Built-in |
 | Dex Improvements | `dex_improvements_server.py` | Built-in |
 | Pendo | Hosted (OAuth) | External (optional) |
+| Figma | Hosted (OAuth) | External (optional) |
+| Alpha Vantage | Hosted (API key) | External (optional) |
+| Linear | `mcp-remote` | External (optional) |
+| Mixpanel | `mcp-remote` | External (optional) |
+| Supabase | `@supabase/mcp-server-supabase` | External (optional) |
 
 ### Setting Up Integrations
 
@@ -290,6 +295,11 @@ See `System/.mcp.json.example` for a complete config with all built-in servers:
 
 **External integrations (optional):**
 - Pendo MCP - Hosted by Pendo with OAuth (https://support.pendo.io/hc/en-us/articles/41102236924955)
+- Figma MCP - Official remote server with OAuth (https://mcp.figma.com/mcp)
+- Alpha Vantage MCP - Stock market data, fundamentals, technicals, commodities (https://mcp.alphavantage.co/)
+- Linear MCP - Issue tracking via `mcp-remote`
+- Mixpanel MCP - Product analytics via `mcp-remote`
+- Supabase MCP - Database access via `@supabase/mcp-server-supabase`
 
 Example config:
 
