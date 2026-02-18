@@ -9,37 +9,38 @@ Built on Claude Code with MCP integrations. Run skills like `/daily-plan` or `/d
 ## How It Works
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│                  Chief of Staff (Claude Code CLI)                  │
-│                                                                   │
-│  /daily-plan  /dub-daily  /week-plan  /review  /meeting-prep      │
-│                                                                   │
-│  ┌──────────┐ ┌────────┐ ┌──────────┐ ┌───────┐ ┌─────┐ ┌─────┐ │
-│  │ Mixpanel │ │ Linear │ │ Calendar │ │ Work  │ │Figma│ │Alpha│ │
-│  │   MCP    │ │  MCP   │ │   MCP    │ │  MCP  │ │ MCP │ │Vant.│ │
-│  └────┬─────┘ └───┬────┘ └────┬─────┘ └───┬───┘ └──┬──┘ └──┬──┘ │
-│       └─────┬─────┴─────┬─────┴────────────┘        │       │    │
-│             ▼           ▼                           ▼       ▼    │
-│       ┌───────────────────────────────────────────────────────┐   │
-│       │  /dub-daily synthesizes all sources                   │   │
-│       │  → maps projects to 3 pillars                         │   │
-│       │  → writes 1 snapshot row per day                      │   │
-│       └──────────────────────┬────────────────────────────────┘   │
-└──────────────────────────────┼────────────────────────────────────┘
-                               ▼
-                      ┌────────────────┐
-                      │   Supabase     │  ← shared backend
-                      │  cos_daily_    │
-                      │  snapshot +    │
-                      │  KPIs, CX,     │
-                      │  experiments   │
-                      └────────┬───────┘
-                               ▼
-                      ┌────────────────┐
-                      │ dub_analysis_  │  ← dashboard
-                      │ tool (GitHub   │    (reads Supabase,
-                      │  Pages)        │     renders all tabs)
-                      └────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                   Chief of Staff (Claude Code CLI)                    │
+│                                                                      │
+│  /daily-plan  /dub-daily  /week-plan  /review  /meeting-prep         │
+│                                                                      │
+│  ┌────────┐ ┌────────┐ ┌──────────┐ ┌──────┐ ┌───────┐ ┌─────────┐ │
+│  │Mixpanel│ │ Linear │ │ Calendar │ │ Work │ │ Figma │ │Alpha    │ │
+│  │  MCP   │ │  MCP   │ │   MCP    │ │ MCP  │ │  MCP  │ │Vantage  │ │
+│  └───┬────┘ └───┬────┘ └────┬─────┘ └──┬───┘ └───┬───┘ └────┬────┘ │
+│      └────┬─────┴─────┬─────┴──────────┴─────────┘          │      │
+│           └───────────┴──────────────────────────────────────┘      │
+│                                  ▼                                   │
+│            ┌───────────────────────────────────────┐                 │
+│            │  /dub-daily synthesizes all sources   │                 │
+│            │  → maps projects to 3 pillars         │                 │
+│            │  → writes 1 snapshot row per day      │                 │
+│            └──────────────┬────────────────────────┘                 │
+└───────────────────────────┼──────────────────────────────────────────┘
+                            ▼
+                   ┌────────────────┐
+                   │   Supabase     │  ← shared backend
+                   │  cos_daily_    │
+                   │  snapshot +    │
+                   │  KPIs, CX,     │
+                   │  experiments   │
+                   └────────┬───────┘
+                            ▼
+                   ┌────────────────┐
+                   │ dub_analysis_  │  ← dashboard
+                   │ tool (GitHub   │    (reads Supabase,
+                   │  Pages)        │     renders all tabs)
+                   └────────────────┘
 ```
 
 **Chief of Staff** is the orchestration layer — it connects to Mixpanel, Linear, Calendar, Work, Figma, and Alpha Vantage via MCP servers, gathers data, and synthesizes it.
