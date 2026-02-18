@@ -9,40 +9,40 @@ Built on Claude Code with MCP integrations. Run skills like `/daily-plan` or `/d
 ## How It Works
 
 ```
-┌──────────────────────────────────────────────────┐
-│          Chief of Staff (Claude Code CLI)         │
-│                                                   │
-│  /daily-plan  /dub-daily  /week-plan  /review     │
-│                                                   │
-│  ┌──────────┐ ┌────────┐ ┌──────────┐ ┌───────┐  │
-│  │ Mixpanel │ │ Linear │ │ Calendar │ │ Work  │  │
-│  │   MCP    │ │  MCP   │ │   MCP    │ │  MCP  │  │
-│  └────┬─────┘ └───┬────┘ └────┬─────┘ └───┬───┘  │
-│       └─────┬─────┴─────┬─────┘            │      │
-│             ▼           ▼                  ▼      │
-│       ┌───────────────────────────────────────┐   │
-│       │  /dub-daily synthesizes all sources   │   │
-│       │  → maps projects to 3 pillars         │   │
-│       │  → writes 1 snapshot row per day      │   │
-│       └──────────────┬────────────────────────┘   │
-└──────────────────────┼────────────────────────────┘
-                       ▼
-              ┌────────────────┐
-              │   Supabase     │  ← shared backend
-              │  cos_daily_    │
-              │  snapshot +    │
-              │  KPIs, CX,     │
-              │  experiments   │
-              └────────┬───────┘
-                       ▼
-              ┌────────────────┐
-              │ dub_analysis_  │  ← dashboard
-              │ tool (GitHub   │    (reads Supabase,
-              │  Pages)        │     renders all tabs)
-              └────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│                  Chief of Staff (Claude Code CLI)                  │
+│                                                                   │
+│  /daily-plan  /dub-daily  /week-plan  /review  /meeting-prep      │
+│                                                                   │
+│  ┌──────────┐ ┌────────┐ ┌──────────┐ ┌───────┐ ┌─────┐ ┌─────┐ │
+│  │ Mixpanel │ │ Linear │ │ Calendar │ │ Work  │ │Figma│ │Alpha│ │
+│  │   MCP    │ │  MCP   │ │   MCP    │ │  MCP  │ │ MCP │ │Vant.│ │
+│  └────┬─────┘ └───┬────┘ └────┬─────┘ └───┬───┘ └──┬──┘ └──┬──┘ │
+│       └─────┬─────┴─────┬─────┴────────────┘        │       │    │
+│             ▼           ▼                           ▼       ▼    │
+│       ┌───────────────────────────────────────────────────────┐   │
+│       │  /dub-daily synthesizes all sources                   │   │
+│       │  → maps projects to 3 pillars                         │   │
+│       │  → writes 1 snapshot row per day                      │   │
+│       └──────────────────────┬────────────────────────────────┘   │
+└──────────────────────────────┼────────────────────────────────────┘
+                               ▼
+                      ┌────────────────┐
+                      │   Supabase     │  ← shared backend
+                      │  cos_daily_    │
+                      │  snapshot +    │
+                      │  KPIs, CX,     │
+                      │  experiments   │
+                      └────────┬───────┘
+                               ▼
+                      ┌────────────────┐
+                      │ dub_analysis_  │  ← dashboard
+                      │ tool (GitHub   │    (reads Supabase,
+                      │  Pages)        │     renders all tabs)
+                      └────────────────┘
 ```
 
-**Chief of Staff** is the orchestration layer — it connects to Mixpanel, Linear, Calendar, and Work via MCP servers, gathers data, and synthesizes it.
+**Chief of Staff** is the orchestration layer — it connects to Mixpanel, Linear, Calendar, Work, Figma, and Alpha Vantage via MCP servers, gathers data, and synthesizes it.
 
 **Supabase** is the shared backend — snapshots and analysis results are written here. Edge Functions sync raw platform data (Mixpanel events, AppsFlyer metrics, support tickets).
 
@@ -79,6 +79,8 @@ After onboarding, you'll need API access configured in your local `.mcp.json` fo
 |-------------|------|--------|
 | Linear | Remote MCP | OAuth (auto-configured) |
 | Mixpanel | Remote MCP | OAuth (auto-configured) |
+| Figma | Remote MCP | OAuth (auto-configured) |
+| Alpha Vantage | Remote MCP | API key |
 | Supabase | npm package | Requires `SUPABASE_ACCESS_TOKEN` |
 
 Built-in MCPs (Calendar, Work, Career, etc.) work immediately after `./install.sh`.
@@ -192,65 +194,58 @@ Linear integration covers the full dub engineering org:
 | **Linear** | Issue tracking, project status, engineering velocity |
 | **Mixpanel** | Product analytics, funnel queries, segmentation |
 | **Supabase** | Database access for dashboard data and analysis results |
-| **Figma** | Design context and screenshots |
+| **Figma** | Design context, screenshots, and component inspection |
+| **Alpha Vantage** | Market data, stock fundamentals, technicals, commodities |
 
 ---
 
 ## Skills Reference
 
-### dub-Specific
-
-| Skill | Description |
-|-------|-------------|
-| `/dub-daily` | Generate daily dashboard snapshot and publish to Executive Summary |
-| `/daily-plan` | Morning briefing with calendar, tasks, priorities + auto dashboard sync |
-
-### Planning & Review
-
-| Skill | Description |
-|-------|-------------|
-| `/week-plan` | Set weekly priorities |
-| `/week-review` | Review week's progress |
-| `/quarter-plan` | Set quarterly goals |
-| `/quarter-review` | Review quarter completion |
-| `/daily-review` | End of day review with learning capture |
-
-### Meetings & People
-
-| Skill | Description |
-|-------|-------------|
-| `/meeting-prep` | Prepare for meetings with attendee context |
-| `/process-meetings` | Process Granola transcripts into structured notes |
-| `/triage` | Route inbox items and extract scattered tasks |
-
-### Career
-
-| Skill | Description |
-|-------|-------------|
-| `/career-coach` | Career coaching with 4 modes |
-| `/resume-builder` | Guided resume building |
-
-### Projects & Products
-
-| Skill | Description |
-|-------|-------------|
-| `/project-health` | Scan active projects for status and blockers |
-| `/product-brief` | Generate PRD from guided questions |
-
-### System
-
-| Skill | Description |
-|-------|-------------|
-| `/health-check` | Diagnose and fix MCP server issues |
-| `/dex-level-up` | Discover unused features based on usage patterns |
-| `/enable-semantic-search` | Enable local AI-powered semantic search |
-| `/xray` | Understand what just happened under the hood |
-
-### Framework Skills (25 business strategy frameworks)
-
-Invoke with `/skill-name` for structured analysis using proven frameworks:
-
-`/lean-startup` `/jobs-to-be-done` `/crossing-the-chasm` `/blue-ocean-strategy` `/obviously-awesome` `/cro-methodology` `/hundred-million-offers` `/design-sprint` `/negotiation` `/made-to-stick` `/contagious` `/influence-psychology` `/hooked-ux` `/storybrand-messaging` `/one-page-marketing` `/predictable-revenue` `/scorecard-marketing` `/traction-eos` `/drive-motivation` `/refactoring-ui` `/ux-heuristics` `/top-design` `/ios-hig-design` `/web-typography` `/design-everyday-things`
+| Skill | Type | Description |
+|-------|------|-------------|
+| `/dub-daily` | dub | Generate daily dashboard snapshot and publish to Executive Summary |
+| `/daily-plan` | dub | Morning briefing with calendar, tasks, priorities + auto dashboard sync |
+| `/daily-review` | Planning | End of day review with learning capture |
+| `/week-plan` | Planning | Set weekly priorities based on goals, calendar, and task effort |
+| `/week-review` | Planning | Review week's accomplishments, detect patterns, track goals |
+| `/quarter-plan` | Planning | Set 3-5 strategic quarterly goals aligned to pillars |
+| `/quarter-review` | Planning | Review quarter completion and capture learnings |
+| `/meeting-prep` | Meetings | Prepare for meetings with attendee context and open items |
+| `/process-meetings` | Meetings | Process Granola transcripts into structured notes |
+| `/triage` | Meetings | Route inbox items and extract scattered tasks |
+| `/career-coach` | Career | Weekly reports, monthly reflections, self-reviews, promotion assessments |
+| `/resume-builder` | Career | Guided resume building with career evidence integration |
+| `/project-health` | Projects | Scan active projects for status and blockers |
+| `/product-brief` | Projects | Generate PRD from guided questions |
+| `/health-check` | System | Diagnose and fix MCP server issues |
+| `/dex-level-up` | System | Discover unused features based on usage patterns |
+| `/enable-semantic-search` | System | Enable local AI-powered semantic search |
+| `/xray` | System | Understand what just happened under the hood |
+| `/lean-startup` | Framework | Validated learning, MVP design, build-measure-learn |
+| `/jobs-to-be-done` | Framework | Customer job discovery and innovation strategy |
+| `/crossing-the-chasm` | Framework | Technology adoption lifecycle and go-to-market |
+| `/blue-ocean-strategy` | Framework | Uncontested market space and value innovation |
+| `/obviously-awesome` | Framework | Product positioning and competitive alternatives |
+| `/cro-methodology` | Framework | Conversion rate optimization and landing page audits |
+| `/hundred-million-offers` | Framework | Irresistible offer creation and value equation |
+| `/design-sprint` | Framework | 5-day rapid prototyping and validation |
+| `/negotiation` | Framework | Tactical negotiation (Never Split the Difference) |
+| `/made-to-stick` | Framework | Sticky messaging with SUCCESs model |
+| `/contagious` | Framework | Word-of-mouth engineering with STEPPS |
+| `/influence-psychology` | Framework | Persuasion science (Cialdini's 6 principles) |
+| `/hooked-ux` | Framework | Habit-forming product design |
+| `/storybrand-messaging` | Framework | Brand messaging with StoryBrand framework |
+| `/one-page-marketing` | Framework | End-to-end marketing plan |
+| `/predictable-revenue` | Framework | Outbound sales process and Cold Calling 2.0 |
+| `/scorecard-marketing` | Framework | Lead generation via quiz/assessment funnels |
+| `/traction-eos` | Framework | Entrepreneurial Operating System |
+| `/drive-motivation` | Framework | Intrinsic motivation and autonomy/mastery/purpose |
+| `/refactoring-ui` | Framework | Practical UI design system |
+| `/ux-heuristics` | Framework | Usability audits (Nielsen + Krug) |
+| `/top-design` | Framework | Award-winning web design patterns |
+| `/ios-hig-design` | Framework | Native iOS design (Apple HIG) |
+| `/web-typography` | Framework | Typeface selection and responsive typography |
+| `/design-everyday-things` | Framework | Affordances, signifiers, and design principles |
 
 ---
 
