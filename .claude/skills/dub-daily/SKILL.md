@@ -180,7 +180,7 @@ Compute:
 - For each Zack-led project, map to pillar via PILLAR_OVERRIDES → PILLAR_KEYWORDS fallback
 - Generate headline: "X completed, Y created, Z blockers this week"
 
-#### 1d. Supabase Queries (Existing Analysis)
+#### 1d. Supabase Queries (Existing Analysis + Pillar Metrics)
 
 Read from already-synced tables to denormalize into snapshot:
 
@@ -190,6 +190,56 @@ FROM support_analysis_results ORDER BY created_at DESC LIMIT 1;
 
 SELECT analysis_date, total_experiments, insights
 FROM experiment_analysis_results ORDER BY analysis_date DESC LIMIT 1;
+```
+
+**Pillar metric queries — run these in parallel for each pillar:**
+
+**Premium Creator Revenue:**
+```sql
+SELECT stats_data FROM summary_stats ORDER BY calculated_at DESC LIMIT 1;
+-- Extract: subscription_rate (key metric)
+
+SELECT total_subscriptions, total_paywall_views, total_stripe_modal_views,
+       paywall_views_delta_pct, copy_starts_delta_pct
+FROM premium_creator_metrics
+ORDER BY created_at DESC LIMIT 20;
+-- Aggregate: total subs, paywall→stripe modal conversion, WoW delta
+
+SELECT price_point, subscriber_count, total_revenue
+FROM creator_subscriptions_by_price
+ORDER BY created_at DESC LIMIT 1;
+-- Context: subscription distribution by price tier
+```
+
+**First Copy Conversion:**
+```sql
+SELECT stats_data FROM summary_stats ORDER BY calculated_at DESC LIMIT 1;
+-- Extract: copy_rate (key metric)
+
+SELECT path_description, conversion_rate, user_count
+FROM conversion_path_analysis
+ORDER BY created_at DESC LIMIT 10;
+-- Context: top conversion paths leading to first copy
+
+SELECT metric_name, mean_value, median_value
+FROM event_sequence_metrics
+ORDER BY created_at DESC LIMIT 5;
+-- Context: how many portfolios/creators viewed before copying
+```
+
+**Maximize LTV:CAC:**
+```sql
+SELECT stats_data FROM summary_stats ORDER BY calculated_at DESC LIMIT 1;
+-- Extract: deposit_rate, link_bank_rate (key metrics)
+
+SELECT cohort_week, net_ltv_week_4, net_ltv_week_12, net_ltv_week_26
+FROM ltv_cohort_analysis
+ORDER BY cohort_week DESC LIMIT 8;
+-- Context: LTV trajectory by recent cohorts
+
+SELECT summary_data FROM appsflyer_summary_metrics
+ORDER BY created_at DESC LIMIT 1;
+-- Context: CAC, ROAS, ROI from attribution data
 ```
 
 #### 1e. Alpha Vantage — Market Context (Optional)
@@ -231,30 +281,67 @@ Read `System/Session_Learnings/` for yesterday's date file:
 
 ---
 
-### Step 2: Synthesize TL;DR
+### Step 2: Synthesize Pillar Metrics
 
-Structure the summary around the 3 strategic pillars. One line per pillar with the most relevant data point and status. Use available data sources — as more integrations come online (Mixpanel metrics, Linear velocity), incorporate them.
+Build the `pillar_metrics` JSONB object from the Supabase and Mixpanel data gathered in Step 1d. Each pillar gets a key metric, WoW change, and a 1-2 sentence AI-generated analysis. **Do NOT include Linear issues or project status** — those belong in the Engineering section.
 
-Format — one `<strong>` pillar name per line, followed by a concise status:
+**JSONB structure:**
 
+```json
+{
+  "premium_creator_revenue": {
+    "key_metric": "2.1%",
+    "metric_label": "Subscription Rate",
+    "wow_change": "+0.3pp",
+    "wow_direction": "up",
+    "analysis": "Subscription rate up driven by higher paywall-to-modal conversion. $9.99 tier accounts for 62% of new subs this week."
+  },
+  "first_copy_conversion": {
+    "key_metric": "8.4%",
+    "metric_label": "Copy Rate",
+    "wow_change": "-0.2pp",
+    "wow_direction": "down",
+    "analysis": "Copy rate slightly down. Users viewing 3+ portfolios before copying convert at 2.4x the rate of single-view users."
+  },
+  "ltv_cac": {
+    "key_metric": "12.1%",
+    "metric_label": "Deposit Rate",
+    "wow_change": "+0.5pp",
+    "wow_direction": "up",
+    "analysis": "Deposit rate improving. Week-4 LTV for Jan cohorts trending 8% above Dec cohorts. ROAS at 1.3x across paid channels."
+  }
+}
 ```
-<strong>Premium Creator Revenue</strong> — [key metric or project status]
-<strong>First Copy Conversion</strong> — [key metric or project status]
-<strong>Maximize LTV:CAC</strong> — [key metric or project status]
-```
 
-**Data to include per pillar (use what's available):**
-- KPI from summary_stats (subscription rate, copy rate, deposit/link bank rates) with WoW change if comparison data exists
-- Linear project status mapped to pillar (from LINEAR_PROJECTS config)
-- Blockers or red flags affecting that pillar
-- Mixpanel funnel trends (when configured)
+**Per-pillar instructions:**
 
-**If a data source isn't available yet**, use whatever is — even a qualitative status from tasks or goals is better than nothing. Never show "N/A" — omit the pillar line entirely if there's truly nothing to say.
+**Premium Creator Revenue:**
+- `key_metric`: Subscription rate from `summary_stats.stats_data`
+- `metric_label`: "Subscription Rate"
+- `wow_change`: Compare current value to prior period if data exists (from `summary_stats` history or Mixpanel subscription funnel 84782977)
+- `analysis`: Synthesize from `premium_creator_metrics` (paywall→modal conversion, delta trends) and `creator_subscriptions_by_price` (price tier distribution). 1-2 sentences, data-driven.
 
-Example (with full integrations):
-> **Premium Creator Revenue** — Sub rate 2.1%, up 0.3pp WoW. Plus Subscription project on track.
-> **First Copy Conversion** — Copy rate 8.4%, flat WoW. 2 blockers in activation experimentation.
-> **Maximize LTV:CAC** — Deposit rate 12.1%, down 0.5pp. Link bank funnel needs attention.
+**First Copy Conversion:**
+- `key_metric`: Copy rate from `summary_stats.stats_data`
+- `metric_label`: "Copy Rate"
+- `wow_change`: Compare current value to prior period if data exists (from `summary_stats` history or Mixpanel copy funnel 85419313)
+- `analysis`: Synthesize from `conversion_path_analysis` (top paths) and `event_sequence_metrics` (portfolios viewed before copy). 1-2 sentences, data-driven.
+
+**Maximize LTV:CAC:**
+- `key_metric`: Deposit rate from `summary_stats.stats_data`
+- `metric_label`: "Deposit Rate"
+- `wow_change`: Compare current value to prior period if data exists (from `summary_stats` history or Mixpanel deposit funnel 84590385)
+- `analysis`: Synthesize from `ltv_cohort_analysis` (LTV trajectory) and `appsflyer_summary_metrics` (CAC/ROAS). 1-2 sentences, data-driven.
+
+**wow_direction values:** `"up"`, `"down"`, or `"flat"`
+
+**Analysis guidelines:**
+- Always cite a specific number or comparison from the data
+- Focus on the "so what" — what does this mean, not just what the number is
+- If a data source query returns empty, note what's available and skip what isn't
+- Never fabricate numbers — only use values returned from Supabase/Mixpanel queries
+
+**Also generate `daily_tldr`** as a simple text fallback (3 lines, one per pillar, same content as the analysis fields joined together). Used if `pillar_metrics` rendering fails.
 
 ---
 
