@@ -283,7 +283,15 @@ Skip anything that only matters to institutional traders. Focus on "what moved, 
 
 Build `market_context` JSONB: `{ generated_at, market_status, insights[], market_movers: { top_gainers[], top_losers[] } }`
 
-Fail gracefully: if Alpha Vantage is unavailable, set `market_context` to null.
+Fail gracefully: if Alpha Vantage is unavailable (rate limit, timeout, etc.), carry forward the most recent `market_context` from a previous snapshot:
+
+```sql
+SELECT market_context FROM cos_daily_snapshot
+WHERE market_context IS NOT NULL
+ORDER BY created_at DESC LIMIT 1;
+```
+
+Use this as `market_context` in the INSERT. The dashboard always shows the latest available market data, even if today's fetch failed.
 
 
 ---
@@ -397,21 +405,17 @@ INSERT INTO cos_daily_snapshot (
   E'• [pillar 1 summary]\n• [pillar 2 summary]\n• [pillar 3 summary]',
   $pillar_metrics${ ... pillar JSON ... }$pillar_metrics$::jsonb,
   snapshot.data,
-  $market${ ... market JSON or NULL ... }$market$::jsonb,
+  $market${ ... market JSON ... }$market$::jsonb,
   ARRAY['linear', 'supabase', 'alphavantage'],
   $duration_ms
-FROM snapshot
-ON CONFLICT (snapshot_date) DO UPDATE SET
-  daily_tldr = EXCLUDED.daily_tldr,
-  pillar_metrics = EXCLUDED.pillar_metrics,
-  linear_snapshot = EXCLUDED.linear_snapshot,
-  market_context = EXCLUDED.market_context,
-  data_sources_used = EXCLUDED.data_sources_used,
-  generation_duration_ms = EXCLUDED.generation_duration_ms,
-  created_at = now();
+FROM snapshot;
 ```
 
-**Key:** The CTEs build `linear_snapshot` server-side from `linear_issues` — no need to read the individual query results first. Substitute `pillar_metrics` and `market_context` with the synthesized JSONB from Steps 1b/1c. Use dollar-quoting (`$tag$...$tag$`) for safe JSON embedding.
+**Key points:**
+- **No ON CONFLICT** — each `/dub-daily` run inserts a new row. The frontend reads the most recent row via `ORDER BY created_at DESC LIMIT 1`.
+- The CTEs build `linear_snapshot` server-side from `linear_issues` — no need to read query results first.
+- For `market_context`: if Alpha Vantage succeeded, use the fresh data. If it failed, use the fallback from the most recent non-null snapshot (see Step 1c).
+- Use dollar-quoting (`$tag$...$tag$`) for safe JSON embedding.
 
 ---
 
@@ -426,10 +430,10 @@ SELECT linear_snapshot IS NOT NULL as has_linear,
        jsonb_array_length(COALESCE(linear_snapshot->'action_cards'->'qa_required', '[]'::jsonb)) as qa_count,
        jsonb_array_length(COALESCE(linear_snapshot->'action_cards'->'attention_required', '[]'::jsonb)) as attention_count,
        jsonb_array_length(COALESCE(linear_snapshot->'action_cards'->'upcoming_priorities', '[]'::jsonb)) as upcoming_count
-FROM cos_daily_snapshot WHERE snapshot_date = 'YYYY-MM-DD';
+FROM cos_daily_snapshot ORDER BY created_at DESC LIMIT 1;
 ```
 
-All REQUIRED columns (`has_linear`, `has_market`) must be true. If `upcoming_count` = 0, re-run Roadmap query. Warn user about any missing required sources.
+All REQUIRED columns (`has_linear`, `has_pillar`) must be true. `has_market` should be true (carried forward from previous snapshot if Alpha Vantage failed). If `upcoming_count` = 0, re-run Roadmap query. Warn user about any missing required sources.
 
 Display compact summary:
 ```
