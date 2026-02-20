@@ -96,7 +96,7 @@ All data is organized around dub's three strategic pillars:
 |--------|---------------|
 | **Premium Creator Revenue** | Creator earnings, Premium subscription, PDP, discovery |
 | **First Copy Conversion** | Activation experiments, onboarding, copy trading optimization |
-| **Maximize LTV:CAC** | Subscription lifecycle, Braze, AppsFlyer attribution, deposit/link bank funnels |
+| **Maximize LTV** | Subscription lifecycle, Braze, AppsFlyer attribution, deposit/link bank funnels |
 
 Linear projects, Mixpanel funnels, tasks, and goals all map to these pillars automatically.
 

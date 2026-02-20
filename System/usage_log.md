@@ -100,7 +100,7 @@
 - [ ] Custom skill created (`/create-skill`)
 - [ ] Demo mode used (`/dex-demo`)
 - [ ] Vault reset (`/reset`)
-- [ ] Setup re-run (`/setup`)
+- [x] Setup re-run (`/setup`)
 
 ---
 
@@ -108,7 +108,7 @@
 
 - **Last dex-level-up prompt:** (not yet prompted)
 - **First daily plan:** (not yet run)
-- **Setup date:** (set during onboarding)
+- **Setup date:** 2026-02-17
 
 ---
 

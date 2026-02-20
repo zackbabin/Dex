@@ -25,7 +25,7 @@ TABLE: cos_daily_snapshot
 LINEAR_PRIMARY_TEAM: "dub 3.0"
 LINEAR_TEAM_ID: "268053e9-b3a1-42d8-a01d-0870c5231346"
 
-# Leadership team (used for Attention Required + Project filtering)
+# Leadership team (used for Project filtering)
 LEADERSHIP_IDS:
   zack: "04c633dd-c65e-42f5-bb9f-58016fd4fc43"
   steven: "dda1a6c3-3e6d-46c3-b565-6bd742cb5abe"
@@ -99,40 +99,19 @@ SELECT net.http_post(
 
 Then poll `sync_logs` every 10s (up to 60s) until status = 'completed'. If it doesn't complete in time, proceed with existing data.
 
-**Steps 2-4 — Linear queries (reference only).** These are built inline as CTEs in the Step 3 INSERT — no need to run them separately. Documented here for debugging.
+**Steps 2-3 — Linear queries (reference only).** These are built inline as CTEs in the Step 3 INSERT — no need to run them separately. Documented here for debugging.
 
-**Step 2 — QA Required** (`action_cards.qa_required[]`):
-
-```sql
-SELECT identifier, LEFT(title, 100) as title, state_name as status, url,
-       assignee_name as assignee, updated_at, cycle_number
-FROM linear_issues
-WHERE state_name IN ('Ready For QA Dev', 'In QA Dev', 'Ready for QA Prod', 'In QA Prod')
-  AND state_type != 'canceled'
-ORDER BY CASE state_name
-    WHEN 'In QA Prod' THEN 1 WHEN 'Ready for QA Prod' THEN 2
-    WHEN 'In QA Dev' THEN 3 WHEN 'Ready For QA Dev' THEN 4 END,
-  cycle_number ASC NULLS LAST, updated_at DESC;
-```
-
-**Step 3 — Attention Required** (single SQL query → `action_cards.attention_required[]`):
+**Step 2 — Projects** (from `linear_projects` table, synced by edge function → `action_cards.projects[]`):
 
 ```sql
-SELECT identifier, LEFT(title, 100) as title, state_name as status, url,
-       assignee_name as assignee, updated_at, cycle_number
-FROM linear_issues
-WHERE team_name IN ('dub Pod 0', 'dub Pod 1', 'dub Crypto', 'dub Web')
-  AND state_name NOT IN ('Blocked', 'Canceled', 'Done', 'Deleted')
-  AND cycle_number IS NOT NULL
-ORDER BY CASE state_name
-    WHEN 'In QA Prod' THEN 1 WHEN 'Ready for QA Prod' THEN 2
-    WHEN 'In QA Dev' THEN 3 WHEN 'Ready For QA Dev' THEN 4
-    WHEN 'In Review' THEN 5 WHEN 'In Progress' THEN 6
-    WHEN 'Todo' THEN 7 WHEN 'Triage' THEN 8 WHEN 'Backlog' THEN 9 END,
-  cycle_number ASC, updated_at DESC;
+SELECT name, state, priority, priority_label, lead_name as lead, url, created_at
+FROM linear_projects
+WHERE state IN ('started', 'planned')
+ORDER BY CASE WHEN priority = 0 THEN 99 ELSE priority END ASC,
+  state ASC, created_at DESC;
 ```
 
-**Step 4 — Upcoming Priorities** (single SQL query → `action_cards.upcoming_priorities[]`):
+**Step 3 — Upcoming Priorities** (from `linear_issues` → `action_cards.upcoming_priorities[]`):
 
 ```sql
 SELECT identifier, LEFT(title, 100) as title, state_name as status, url,
@@ -148,18 +127,9 @@ ORDER BY cycle_number ASC NULLS LAST, updated_at DESC
 LIMIT 100;
 ```
 
-**Step 5 — Projects** (optional — use `list_projects` MCP if needed for leadership-filtered project data):
-- `list_projects` with team "dub 3.0" (lightweight call, no descriptions)
-- Filter to projects where `lead.id` matches any leadership team member
-- Exclude status "Completed"
-- For each project, assign pillar via PILLAR_OVERRIDES → PILLAR_KEYWORDS fallback
-- Extract: name, status, pillar, lead name, url
-- Store in `linear_snapshot.projects[]`
-
-**Fields stored per issue in snapshot JSONB:**
-- All cards: `identifier`, `title` (max 100 chars), `status`, `url`, `cycle_number`, `updated_at`
-- QA Required & Attention Required: + `assignee` (name)
-- Upcoming Priorities: + `project` (name)
+**Fields stored per item in snapshot JSONB:**
+- Projects: `name`, `state`, `priority`, `priority_label`, `lead` (name), `url`, `created_at`
+- Upcoming Priorities: `identifier`, `title` (max 100 chars), `status`, `url`, `project` (name), `cycle_number`, `updated_at`
 - Never store descriptions — they bloat JSONB
 
 **Rules:**
@@ -337,32 +307,17 @@ Also generate `daily_tldr` as text fallback (3 lines, one per pillar). Used if `
 **Build `linear_snapshot` JSONB inline via CTEs** — this avoids passing a 70KB+ JSON string through context. The database aggregates the issues directly:
 
 ```sql
-WITH qa AS (
+WITH projects AS (
   SELECT COALESCE(jsonb_agg(jsonb_build_object(
-    'identifier', identifier, 'title', LEFT(title, 100), 'status', state_name,
-    'url', url, 'assignee', assignee_name, 'updated_at', updated_at, 'cycle_number', cycle_number
-  ) ORDER BY CASE state_name
-    WHEN 'In QA Prod' THEN 1 WHEN 'Ready for QA Prod' THEN 2
-    WHEN 'In QA Dev' THEN 3 WHEN 'Ready For QA Dev' THEN 4 END,
-    cycle_number ASC NULLS LAST, updated_at DESC), '[]'::jsonb) as items
-  FROM linear_issues
-  WHERE state_name IN ('Ready For QA Dev', 'In QA Dev', 'Ready for QA Prod', 'In QA Prod')
-    AND state_type != 'canceled'
-),
-attention AS (
-  SELECT COALESCE(jsonb_agg(jsonb_build_object(
-    'identifier', identifier, 'title', LEFT(title, 100), 'status', state_name,
-    'url', url, 'assignee', assignee_name, 'updated_at', updated_at, 'cycle_number', cycle_number
-  ) ORDER BY CASE state_name
-    WHEN 'In QA Prod' THEN 1 WHEN 'Ready for QA Prod' THEN 2
-    WHEN 'In QA Dev' THEN 3 WHEN 'Ready For QA Dev' THEN 4
-    WHEN 'In Review' THEN 5 WHEN 'In Progress' THEN 6
-    WHEN 'Todo' THEN 7 WHEN 'Triage' THEN 8 WHEN 'Backlog' THEN 9 END,
-    cycle_number ASC, updated_at DESC), '[]'::jsonb) as items
-  FROM linear_issues
-  WHERE team_name IN ('dub Pod 0', 'dub Pod 1', 'dub Crypto', 'dub Web')
-    AND state_name NOT IN ('Blocked', 'Canceled', 'Done', 'Deleted')
-    AND cycle_number IS NOT NULL
+    'name', name, 'state', state, 'priority', priority,
+    'priority_label', priority_label, 'lead', lead_name,
+    'url', url, 'created_at', created_at::text
+  ) ORDER BY
+    CASE WHEN priority = 0 THEN 99 ELSE priority END ASC,
+    state ASC,
+    created_at DESC), '[]'::jsonb) as items
+  FROM linear_projects
+  WHERE state IN ('started', 'planned')
 ),
 upcoming AS (
   SELECT COALESCE(jsonb_agg(jsonb_build_object(
@@ -385,17 +340,15 @@ snapshot AS (
   SELECT jsonb_build_object(
     'generated_at', now()::text,
     'summary', jsonb_build_object(
-      'qa_count', jsonb_array_length(qa.items),
-      'attention_count', jsonb_array_length(attention.items),
+      'projects_count', jsonb_array_length(projects.items),
       'upcoming_count', jsonb_array_length(upcoming.items)
     ),
     'action_cards', jsonb_build_object(
-      'qa_required', qa.items,
-      'attention_required', attention.items,
+      'projects', projects.items,
       'upcoming_priorities', upcoming.items
     )
   ) as data
-  FROM qa, attention, upcoming
+  FROM projects, upcoming
 )
 INSERT INTO cos_daily_snapshot (
   snapshot_date, daily_tldr, pillar_metrics, linear_snapshot,
@@ -427,8 +380,7 @@ Query back to verify required data was stored:
 SELECT linear_snapshot IS NOT NULL as has_linear,
        market_context IS NOT NULL as has_market,
        pillar_metrics IS NOT NULL as has_pillar,
-       jsonb_array_length(COALESCE(linear_snapshot->'action_cards'->'qa_required', '[]'::jsonb)) as qa_count,
-       jsonb_array_length(COALESCE(linear_snapshot->'action_cards'->'attention_required', '[]'::jsonb)) as attention_count,
+       jsonb_array_length(COALESCE(linear_snapshot->'action_cards'->'projects', '[]'::jsonb)) as projects_count,
        jsonb_array_length(COALESCE(linear_snapshot->'action_cards'->'upcoming_priorities', '[]'::jsonb)) as upcoming_count
 FROM cos_daily_snapshot ORDER BY created_at DESC LIMIT 1;
 ```
@@ -439,7 +391,7 @@ Display compact summary:
 ```
 Dashboard snapshot published for YYYY-MM-DD.
 
-Engineering: QA: X | Attention: Y | Upcoming: Z
+Engineering: Projects: X | Upcoming: Y
 Pillars: [1-line summary per pillar]
 Market: [status + top insight]
 
