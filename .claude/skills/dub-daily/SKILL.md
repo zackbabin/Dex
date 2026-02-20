@@ -71,72 +71,90 @@ Track timing: `const startTime = Date.now();`
 
 **REQUIRED sources (retry once on failure):** Linear (1a), Supabase (1b), Alpha Vantage (1c).
 
-#### 1a. Linear MCP Queries
+**PARALLELISM LIMIT:** Run at most **4 SQL queries in parallel** via `execute_sql`. More than 4 concurrent calls can cause upstream timeouts, and when one sibling fails all parallel siblings are killed. Batch into groups of 4, wait for each batch to complete before starting the next.
 
-Use `mcp__linear__*` tools (load via ToolSearch first).
+#### 1a. Linear Data (via Edge Function + SQL)
 
-**Key optimization:** Query with NO `team` parameter — this returns issues across ALL teams in the workspace (parent + all subteams). No need to discover or iterate subteams separately.
+Data comes from the `linear_issues` and `linear_cycles` tables, populated by the `sync-linear-issues` edge function. This replaces direct Linear MCP calls — the edge function fetches issues across all dub 3.0 subteams (Pod 0, Pod 1, Crypto, Web) with labels, project, and cycle data.
 
-**Current cycles:** Call `list_cycles` for team "dub 3.0" type "current" to get active cycle IDs. Needed to filter Upcoming Priorities.
+**Step 1 — Check sync freshness, trigger if stale:**
 
-**Action card queries (all team-less, `limit: 50`):**
+```sql
+SELECT sync_status, sync_completed_at,
+       EXTRACT(EPOCH FROM (NOW() - sync_completed_at))/60 as minutes_ago
+FROM sync_logs WHERE source = 'linear_issues'
+ORDER BY created_at DESC LIMIT 1;
+```
 
-**1. QA Required** — 4 queries, one per state:
-- `list_issues(state="Ready For QA Dev", limit=50)`
-- `list_issues(state="In QA Dev", limit=50)`
-- `list_issues(state="Ready for QA Prod", limit=50)`
-- `list_issues(state="In QA Prod", limit=50)`
-- Merge all results, deduplicate by identifier
-- Store as `action_cards.qa_required[]`
+If `minutes_ago` < 30 and `sync_status` = 'completed', proceed with existing data — no need to re-sync.
 
-**2. Attention Required** — Query each subteam:
-- `list_issues(team="Pod 0", limit=50)`
-- `list_issues(team="Pod 1", limit=50)`
-- `list_issues(team="Crypto", limit=50)`
-- `list_issues(team="Web", limit=50)`
-- Filter ALL results: exclude "Blocked", "Canceled", "Done", "Deleted" statuses
-- Merge all results, deduplicate by identifier
-- Store as `action_cards.attention_required[]`
+If stale (> 30 min) or no recent sync, trigger a fresh sync via `net.http_post` with the public anon key (edge function deployed with `--no-verify-jwt`):
+```sql
+SELECT net.http_post(
+  url := 'https://rnpfeblxapdafrbmomix.supabase.co/functions/v1/sync-linear-issues',
+  headers := '{"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJucGZlYmx4YXBkYWZyYm1vbWl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkzMjMwNjIsImV4cCI6MjA3NDg5OTA2Mn0.qGTxaIkqspHZcCN1bcyUj6y1HvkOqj4DTmmgDe-df1Q", "Content-Type": "application/json"}'::jsonb,
+  body := '{"force": true}'::jsonb
+);
+```
 
-**3. Upcoming Priorities** — `list_issues(label="Roadmap", limit=250)`
-- Filter: exclude issues where cycleId matches any current cycle ID
-- Filter: exclude "Canceled", "Done", "Deleted" statuses
-- Store as `action_cards.upcoming_priorities[]`
+Then poll `sync_logs` every 10s (up to 60s) until status = 'completed'. If it doesn't complete in time, proceed with existing data.
 
-**Total: ~10 queries** (4 QA + 4 subteam + 1 roadmap), plus `list_cycles` and `list_projects`.
+**Steps 2-4 — Linear queries (reference only).** These are built inline as CTEs in the Step 3 INSERT — no need to run them separately. Documented here for debugging.
 
-**Project queries (leadership-filtered):**
-- `list_projects` with team "dub 3.0"
+**Step 2 — QA Required** (`action_cards.qa_required[]`):
+
+```sql
+SELECT identifier, LEFT(title, 100) as title, state_name as status, url,
+       assignee_name as assignee, updated_at, cycle_number
+FROM linear_issues
+WHERE state_name IN ('Ready For QA Dev', 'In QA Dev', 'Ready for QA Prod', 'In QA Prod')
+  AND state_type != 'canceled'
+ORDER BY CASE state_name
+    WHEN 'In QA Prod' THEN 1 WHEN 'Ready for QA Prod' THEN 2
+    WHEN 'In QA Dev' THEN 3 WHEN 'Ready For QA Dev' THEN 4 END,
+  cycle_number ASC NULLS LAST, updated_at DESC;
+```
+
+**Step 3 — Attention Required** (single SQL query → `action_cards.attention_required[]`):
+
+```sql
+SELECT identifier, LEFT(title, 100) as title, state_name as status, url,
+       assignee_name as assignee, updated_at, cycle_number
+FROM linear_issues
+WHERE team_name IN ('dub Pod 0', 'dub Pod 1', 'dub Crypto', 'dub Web')
+  AND state_name NOT IN ('Blocked', 'Canceled', 'Done', 'Deleted')
+  AND cycle_number IS NOT NULL
+ORDER BY CASE state_name
+    WHEN 'In QA Prod' THEN 1 WHEN 'Ready for QA Prod' THEN 2
+    WHEN 'In QA Dev' THEN 3 WHEN 'Ready For QA Dev' THEN 4
+    WHEN 'In Review' THEN 5 WHEN 'In Progress' THEN 6
+    WHEN 'Todo' THEN 7 WHEN 'Triage' THEN 8 WHEN 'Backlog' THEN 9 END,
+  cycle_number ASC, updated_at DESC;
+```
+
+**Step 4 — Upcoming Priorities** (single SQL query → `action_cards.upcoming_priorities[]`):
+
+```sql
+SELECT identifier, LEFT(title, 100) as title, state_name as status, url,
+       project_name as project, updated_at, cycle_number
+FROM linear_issues
+WHERE 'Roadmap' = ANY(labels)
+  AND state_name NOT IN ('Canceled', 'Done', 'Deleted')
+  AND NOT EXISTS (
+    SELECT 1 FROM linear_cycles lc
+    WHERE lc.is_active = TRUE AND lc.id = linear_issues.cycle_id
+  )
+ORDER BY cycle_number ASC NULLS LAST, updated_at DESC
+LIMIT 100;
+```
+
+**Step 5 — Projects** (optional — use `list_projects` MCP if needed for leadership-filtered project data):
+- `list_projects` with team "dub 3.0" (lightweight call, no descriptions)
 - Filter to projects where `lead.id` matches any leadership team member
 - Exclude status "Completed"
 - For each project, assign pillar via PILLAR_OVERRIDES → PILLAR_KEYWORDS fallback
 - Extract: name, status, pillar, lead name, url
 - Store in `linear_snapshot.projects[]`
-
-**Field extraction — CRITICAL:**
-
-Linear `list_issues` returns full descriptions which overflow context. After EVERY `list_issues` call, immediately extract minimal fields via python3:
-
-```bash
-python3 -c "
-import json, sys
-raw = json.loads(sys.stdin.read())
-issues = raw.get('issues', raw) if isinstance(raw, dict) else raw
-for i in (issues if isinstance(issues, list) else []):
-    print(json.dumps({
-        'identifier': i.get('identifier',''),
-        'title': i.get('title','')[:100],
-        'status': i.get('status',''),
-        'url': i.get('url',''),
-        'project': (i.get('project',{}) or {}).get('name','') if isinstance(i.get('project'), dict) else str(i.get('project','')),
-        'assignee': (i.get('assignee',{}) or {}).get('name','') if isinstance(i.get('assignee'), dict) else str(i.get('assignee','')),
-        'updated_at': i.get('updatedAt', i.get('updated_at','')),
-        'cycle_number': (i.get('cycle',{}) or {}).get('number', None)
-    }))
-" <<< '$RAW_JSON'
-```
-
-If result overflows to a file, read the file in the python3 script instead of stdin.
 
 **Fields stored per issue in snapshot JSONB:**
 - All cards: `identifier`, `title` (max 100 chars), `status`, `url`, `cycle_number`, `updated_at`
@@ -145,39 +163,78 @@ If result overflows to a file, read the file in the python3 script instead of st
 - Never store descriptions — they bloat JSONB
 
 **Rules:**
-- Never delegate Linear queries to sub-agents (Task tool) — they hallucinate when tokens overflow
 - Never fabricate data — empty is always better than fabricated
 
 #### 1b. Supabase Queries (Pillar Metrics)
 
+**CRITICAL — Schema Validation (run FIRST, before ANY data queries):**
+
+The queries below are hardcoded for speed and precision. But the DB schema changes with migrations, so validate them first. Run this once:
+
+```sql
+SELECT table_name, column_name, data_type
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name IN (
+    'summary_stats', 'premium_creator_metrics', 'creator_subscriptions_by_price',
+    'conversion_path_analysis', 'event_sequence_metrics',
+    'ltv_cohort_analysis', 'appsflyer_summary_metrics'
+  )
+ORDER BY table_name, ordinal_position;
+```
+
+**Before running each query below, check the schema results:**
+- Verify every table and column referenced in the query actually exists
+- If a column is missing, find the closest match in that table's schema (e.g., `created_at` → `synced_at`)
+- If a table is missing entirely, skip that query and note the gap
+- For `ltv_cohort_analysis`, check which `week_N_ltv` columns exist and adjust the COALESCE accordingly
+- **Do NOT run a query with columns that don't exist** — fix it first using the schema
+
+**Output format (all 3 pillars must produce this structure for `pillar_metrics` JSONB):**
+
+Each pillar writes to its key (`premium_creator_revenue`, `first_copy_conversion`, `ltv_cac`) with exactly these 5 fields:
+- `key_metric` (string) — the main KPI value, formatted (e.g., "2.1%", "$4.13")
+- `metric_label` (string) — what the metric is (e.g., "Subscription Rate", "Copy Rate", "Avg LTV")
+- `wow_change` (string) — week-over-week change with sign (e.g., "+0.3pp", "-$0.15")
+- `wow_direction` (string) — "up", "down", or "flat"
+- `analysis` (string) — 1-2 sentence AI-generated insight synthesizing the data
+
 Read from already-synced tables to build pillar metrics:
 
-**Premium Creator Revenue:**
+**Premium Creator Revenue** → output key: `premium_creator_revenue`
 ```sql
 SELECT stats_data FROM summary_stats ORDER BY calculated_at DESC LIMIT 1;
--- Extract: subscription_rate
+-- Extract: subscription_rate → key_metric
 
 SELECT total_subscriptions, total_paywall_views, total_stripe_modal_views,
        paywall_views_delta_pct, copy_starts_delta_pct
-FROM premium_creator_metrics ORDER BY created_at DESC LIMIT 20;
+FROM premium_creator_metrics ORDER BY synced_at DESC LIMIT 20;
+-- Use delta percentages → wow_change, wow_direction
 
-SELECT price_point, subscriber_count, total_revenue
-FROM creator_subscriptions_by_price ORDER BY created_at DESC LIMIT 1;
+SELECT creator_username, subscription_price, subscription_interval,
+       total_subscriptions, total_paywall_views
+FROM creator_subscriptions_by_price ORDER BY synced_at DESC LIMIT 1;
+-- Context for analysis
 ```
 
-**First Copy Conversion:**
+**First Copy Conversion** → output key: `first_copy_conversion`
 ```sql
 SELECT stats_data FROM summary_stats ORDER BY calculated_at DESC LIMIT 1;
--- Extract: copy_rate
+-- Extract: copy_rate → key_metric
 
-SELECT path_description, conversion_rate, user_count
+SELECT path_type, analysis_type, path_rank, sequence,
+       converter_count, pct_of_converters, total_converters_analyzed
 FROM conversion_path_analysis ORDER BY created_at DESC LIMIT 10;
+-- Context for analysis (sequence is JSONB with path steps)
 
-SELECT metric_name, mean_value, median_value
-FROM event_sequence_metrics ORDER BY created_at DESC LIMIT 5;
+SELECT mean_unique_portfolios, median_unique_portfolios,
+       mean_unique_creators, median_unique_creators,
+       portfolio_converter_count, creator_converter_count
+FROM event_sequence_metrics ORDER BY calculated_at DESC LIMIT 5;
+-- Use for wow_change, wow_direction
 ```
 
-**Maximize LTV:**
+**Maximize LTV** → output key: `ltv_cac`
 ```sql
 SELECT COALESCE(week_26_ltv, week_25_ltv, week_24_ltv, week_23_ltv, week_22_ltv,
        week_21_ltv, week_20_ltv, week_19_ltv, week_18_ltv, week_17_ltv,
@@ -185,12 +242,15 @@ SELECT COALESCE(week_26_ltv, week_25_ltv, week_24_ltv, week_23_ltv, week_22_ltv,
        week_11_ltv, week_10_ltv, week_9_ltv, week_8_ltv, week_7_ltv,
        week_6_ltv, week_5_ltv, week_4_ltv, week_3_ltv, week_2_ltv, week_1_ltv) as avg_ltv
 FROM ltv_cohort_analysis WHERE cohort_label = 'Avg Cohorts';
+-- → key_metric (adjust COALESCE columns to match schema)
 
 SELECT cohort_week, cohort_label, user_count, week_4_ltv
 FROM ltv_cohort_analysis WHERE cohort_label != 'Avg Cohorts'
 ORDER BY cohort_week DESC LIMIT 8;
+-- Cohort trends → wow_change, wow_direction, analysis
 
-SELECT summary_data FROM appsflyer_summary_metrics ORDER BY created_at DESC LIMIT 1;
+SELECT stats_data FROM appsflyer_summary_metrics ORDER BY created_at DESC LIMIT 1;
+-- Acquisition context for analysis (stats_data is JSONB)
 ```
 
 #### 1c. Alpha Vantage — Daily Market Pulse
@@ -294,16 +354,82 @@ Also generate `daily_tldr` as text fallback (3 lines, one per pillar). Used if `
 
 ### Step 3: Write to Supabase
 
-Upsert via `execute_sql` with dollar-quoting for safe JSONB insertion:
+**Build `linear_snapshot` JSONB inline via CTEs** — this avoids passing a 70KB+ JSON string through context. The database aggregates the issues directly:
 
 ```sql
+WITH qa AS (
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+    'identifier', identifier, 'title', LEFT(title, 100), 'status', state_name,
+    'url', url, 'assignee', assignee_name, 'updated_at', updated_at, 'cycle_number', cycle_number
+  ) ORDER BY CASE state_name
+    WHEN 'In QA Prod' THEN 1 WHEN 'Ready for QA Prod' THEN 2
+    WHEN 'In QA Dev' THEN 3 WHEN 'Ready For QA Dev' THEN 4 END,
+    cycle_number ASC NULLS LAST, updated_at DESC), '[]'::jsonb) as items
+  FROM linear_issues
+  WHERE state_name IN ('Ready For QA Dev', 'In QA Dev', 'Ready for QA Prod', 'In QA Prod')
+    AND state_type != 'canceled'
+),
+attention AS (
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+    'identifier', identifier, 'title', LEFT(title, 100), 'status', state_name,
+    'url', url, 'assignee', assignee_name, 'updated_at', updated_at, 'cycle_number', cycle_number
+  ) ORDER BY CASE state_name
+    WHEN 'In QA Prod' THEN 1 WHEN 'Ready for QA Prod' THEN 2
+    WHEN 'In QA Dev' THEN 3 WHEN 'Ready For QA Dev' THEN 4
+    WHEN 'In Review' THEN 5 WHEN 'In Progress' THEN 6
+    WHEN 'Todo' THEN 7 WHEN 'Triage' THEN 8 WHEN 'Backlog' THEN 9 END,
+    cycle_number ASC, updated_at DESC), '[]'::jsonb) as items
+  FROM linear_issues
+  WHERE team_name IN ('dub Pod 0', 'dub Pod 1', 'dub Crypto', 'dub Web')
+    AND state_name NOT IN ('Blocked', 'Canceled', 'Done', 'Deleted')
+    AND cycle_number IS NOT NULL
+),
+upcoming AS (
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+    'identifier', identifier, 'title', LEFT(title, 100), 'status', state_name,
+    'url', url, 'project', project_name, 'updated_at', updated_at, 'cycle_number', cycle_number
+  ) ORDER BY cycle_number ASC NULLS LAST, updated_at DESC), '[]'::jsonb) as items
+  FROM (
+    SELECT identifier, title, state_name, url, project_name, updated_at, cycle_number, cycle_id
+    FROM linear_issues
+    WHERE 'Roadmap' = ANY(labels)
+      AND state_name NOT IN ('Canceled', 'Done', 'Deleted')
+      AND NOT EXISTS (
+        SELECT 1 FROM linear_cycles lc WHERE lc.is_active = TRUE AND lc.id = linear_issues.cycle_id
+      )
+    ORDER BY cycle_number ASC NULLS LAST, updated_at DESC
+    LIMIT 100
+  ) sub
+),
+snapshot AS (
+  SELECT jsonb_build_object(
+    'generated_at', now()::text,
+    'summary', jsonb_build_object(
+      'qa_count', jsonb_array_length(qa.items),
+      'attention_count', jsonb_array_length(attention.items),
+      'upcoming_count', jsonb_array_length(upcoming.items)
+    ),
+    'action_cards', jsonb_build_object(
+      'qa_required', qa.items,
+      'attention_required', attention.items,
+      'upcoming_priorities', upcoming.items
+    )
+  ) as data
+  FROM qa, attention, upcoming
+)
 INSERT INTO cos_daily_snapshot (
   snapshot_date, daily_tldr, pillar_metrics, linear_snapshot,
   market_context, data_sources_used, generation_duration_ms
-) VALUES (
-  'YYYY-MM-DD', $tldr, $pillar_metrics::jsonb, $linear_snapshot::jsonb,
-  $market_context::jsonb, ARRAY['linear', 'supabase', 'alphavantage'], $duration_ms
-) ON CONFLICT (snapshot_date) DO UPDATE SET
+) SELECT
+  'YYYY-MM-DD',
+  E'• [pillar 1 summary]\n• [pillar 2 summary]\n• [pillar 3 summary]',
+  $pillar_metrics${ ... pillar JSON ... }$pillar_metrics$::jsonb,
+  snapshot.data,
+  $market${ ... market JSON or NULL ... }$market$::jsonb,
+  ARRAY['linear', 'supabase', 'alphavantage'],
+  $duration_ms
+FROM snapshot
+ON CONFLICT (snapshot_date) DO UPDATE SET
   daily_tldr = EXCLUDED.daily_tldr,
   pillar_metrics = EXCLUDED.pillar_metrics,
   linear_snapshot = EXCLUDED.linear_snapshot,
@@ -312,6 +438,8 @@ INSERT INTO cos_daily_snapshot (
   generation_duration_ms = EXCLUDED.generation_duration_ms,
   created_at = now();
 ```
+
+**Key:** The CTEs build `linear_snapshot` server-side from `linear_issues` — no need to read the individual query results first. Substitute `pillar_metrics` and `market_context` with the synthesized JSONB from Steps 1b/1c. Use dollar-quoting (`$tag$...$tag$`) for safe JSON embedding.
 
 ---
 
