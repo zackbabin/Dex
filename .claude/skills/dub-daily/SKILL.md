@@ -285,34 +285,6 @@ Build `market_context` JSONB: `{ generated_at, market_status, insights[], market
 
 Fail gracefully: if Alpha Vantage is unavailable, set `market_context` to null.
 
-<!-- ═══════════════════════════════════════════════════════════════
-     COMMENTED OUT — Available for future activation
-
-#### 1d. Work MCP Queries
-- get_week_progress() → week_progress column
-- get_quarterly_goals() → quarter_goals column
-- list_tasks(status="active") → task_summary column
-- get_commitments_due(date_range="today") → commitments column
-- get_pillar_summary()
-
-#### 1e. Calendar MCP Queries
-- calendar_get_today() → calendar_shape (meeting_count, total hours)
-- analyze_calendar_capacity() → calendar_shape (day_type, free_blocks)
-
-#### 1f. Mixpanel (PLACEHOLDER)
-- Set pillar_metrics to null until report screenshots are provided
-- Once configured: query run_segmentation_query, run_funnels_query per pillar
-- Compare current 7d vs prior 7d for WoW change
-
-#### 1g. Project Health
-- Scan vault 04-Projects/ for active project folders
-- OR use project data from Linear (Step 1a)
-
-#### 1h. Session Learnings
-- Read System/Session_Learnings/ for yesterday's date file
-- Extract learning items (title, suggested_fix, status)
-
-═══════════════════════════════════════════════════════════════ -->
 
 ---
 
