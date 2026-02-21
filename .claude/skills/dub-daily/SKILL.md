@@ -104,9 +104,10 @@ Then poll `sync_logs` every 10s (up to 60s) until status = 'completed'. If it do
 **Step 2 — Projects** (from `linear_projects` table, synced by edge function → `action_cards.projects[]`):
 
 ```sql
-SELECT name, state, priority, priority_label, lead_name as lead, url, created_at
+SELECT name, state, progress, priority, priority_label, lead_name as lead, url, created_at
 FROM linear_projects
 WHERE state IN ('started', 'planned')
+  AND lead_id IN ('04c633dd-c65e-42f5-bb9f-58016fd4fc43', '8db5b997-2f22-4de6-ab7c-f96b7dbec372')
 ORDER BY CASE WHEN priority = 0 THEN 99 ELSE priority END ASC,
   state ASC, created_at DESC;
 ```
@@ -128,7 +129,7 @@ LIMIT 100;
 ```
 
 **Fields stored per item in snapshot JSONB:**
-- Projects: `name`, `state`, `priority`, `priority_label`, `lead` (name), `url`, `created_at`
+- Projects: `name`, `state`, `progress`, `priority`, `priority_label`, `lead` (name), `url`, `created_at`
 - Upcoming Priorities: `identifier`, `title` (max 100 chars), `status`, `url`, `project` (name), `cycle_number`, `updated_at`
 - Never store descriptions — they bloat JSONB
 
@@ -309,15 +310,16 @@ Also generate `daily_tldr` as text fallback (3 lines, one per pillar). Used if `
 ```sql
 WITH projects AS (
   SELECT COALESCE(jsonb_agg(jsonb_build_object(
-    'name', name, 'state', state, 'priority', priority,
-    'priority_label', priority_label, 'lead', lead_name,
-    'url', url, 'created_at', created_at::text
+    'name', name, 'state', state, 'progress', progress,
+    'priority', priority, 'priority_label', priority_label,
+    'lead', lead_name, 'url', url, 'created_at', created_at::text
   ) ORDER BY
     CASE WHEN priority = 0 THEN 99 ELSE priority END ASC,
     state ASC,
     created_at DESC), '[]'::jsonb) as items
   FROM linear_projects
   WHERE state IN ('started', 'planned')
+    AND lead_id IN ('04c633dd-c65e-42f5-bb9f-58016fd4fc43', '8db5b997-2f22-4de6-ab7c-f96b7dbec372')
 ),
 upcoming AS (
   SELECT COALESCE(jsonb_agg(jsonb_build_object(
