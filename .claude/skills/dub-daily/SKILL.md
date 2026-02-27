@@ -163,24 +163,43 @@ ORDER BY table_name, ordinal_position;
 
 **Output format (all 3 pillars must produce this structure for `pillar_metrics` JSONB):**
 
-Each pillar writes to its key (`premium_creator_revenue`, `first_copy_conversion`, `ltv_cac`) with exactly these 5 fields:
-- `key_metric` (string) — the main KPI value, formatted (e.g., "2.1%", "$4.13")
-- `metric_label` (string) — what the metric is (e.g., "Subscription Rate", "Copy Rate", "Avg LTV")
-- `wow_change` (string) — week-over-week change with sign (e.g., "+0.3pp", "-$0.15")
+Each pillar writes to its key (`premium_creator_revenue`, `first_copy_conversion`, `ltv_cac`) with these fields:
+- `key_metric` (string) — the main KPI value, formatted (e.g., "$1,234", "$4.13")
+- `metric_label` (string) — what the metric is (e.g., "Total Revenue", "Copy Rate", "Avg LTV")
+- `wow_change` (string) — week-over-week change with sign (e.g., "+12%", "-$0.15")
 - `wow_direction` (string) — "up", "down", or "flat"
+- `secondary_metric` (string, optional) — a secondary KPI value (e.g., "2.1%")
+- `secondary_metric_label` (string, optional) — label for secondary metric (e.g., "Subscription Rate")
 - `analysis` (string) — 1-2 sentence AI-generated insight synthesizing the data
 
 Read from already-synced tables to build pillar metrics:
 
 **Premium Creator Revenue** → output key: `premium_creator_revenue`
 ```sql
+-- Primary metric: Average revenue per premium creator (latest sync)
+-- NOTE: total_revenue is stored in dollars (not cents)
+SELECT AVG(total_revenue) as avg_revenue, COUNT(*) as creator_count, SUM(total_revenue) as total_revenue
+FROM premium_creator_metrics
+WHERE synced_at = (SELECT MAX(synced_at) FROM premium_creator_metrics);
+-- → key_metric = avg_revenue (format as "$X,XXX"), metric_label = "Avg Creator Revenue"
+-- → include total and creator_count in analysis for context
+
+-- WoW: Compare latest sync avg revenue to previous sync
+SELECT AVG(total_revenue) as prev_avg_revenue
+FROM premium_creator_metrics
+WHERE synced_at = (
+  SELECT DISTINCT synced_at FROM premium_creator_metrics
+  ORDER BY synced_at DESC OFFSET 1 LIMIT 1
+);
+-- Calculate percentage change → wow_change, wow_direction
+
 SELECT stats_data FROM summary_stats ORDER BY calculated_at DESC LIMIT 1;
--- Extract: subscription_rate → key_metric
+-- Extract: subscription_rate → secondary_metric, secondary_metric_label = "Subscription Rate"
 
 SELECT total_subscriptions, total_paywall_views, total_stripe_modal_views,
        paywall_views_delta_pct, copy_starts_delta_pct
 FROM premium_creator_metrics ORDER BY synced_at DESC LIMIT 20;
--- Use delta percentages → wow_change, wow_direction
+-- Context for analysis
 
 SELECT creator_username, subscription_price, subscription_interval,
        total_subscriptions, total_paywall_views
@@ -275,9 +294,10 @@ Build `pillar_metrics` JSONB from Supabase data (Step 1b). Each pillar gets a ke
 ```json
 {
   "premium_creator_revenue": {
-    "key_metric": "2.1%", "metric_label": "Subscription Rate",
-    "wow_change": "+0.3pp", "wow_direction": "up",
-    "analysis": "Subscription rate up driven by higher paywall-to-modal conversion."
+    "key_metric": "$9,588", "metric_label": "Avg Creator Revenue",
+    "wow_change": "+12%", "wow_direction": "up",
+    "secondary_metric": "2.1%", "secondary_metric_label": "Subscription Rate",
+    "analysis": "Avg premium creator revenue at $9,588 across 24 creators ($230K total)."
   },
   "first_copy_conversion": {
     "key_metric": "8.4%", "metric_label": "Copy Rate",
@@ -293,7 +313,7 @@ Build `pillar_metrics` JSONB from Supabase data (Step 1b). Each pillar gets a ke
 ```
 
 **Per-pillar sources:**
-- **Premium Creator Revenue:** subscription_rate from `summary_stats`, paywall→modal conversion from `premium_creator_metrics`, price tier distribution from `creator_subscriptions_by_price`
+- **Premium Creator Revenue:** AVG(total_revenue) from `premium_creator_metrics` (primary, in dollars not cents), subscription_rate from `summary_stats` (secondary), paywall→modal conversion and price tier distribution for analysis context. Include total revenue and creator count in analysis.
 - **First Copy Conversion:** copy_rate from `summary_stats`, top paths from `conversion_path_analysis`, portfolios viewed from `event_sequence_metrics`
 - **Maximize LTV:** avg_ltv from `ltv_cohort_analysis` (most mature non-null week via COALESCE), recent cohort week_4 trend, ROAS from `appsflyer_summary_metrics`
 
