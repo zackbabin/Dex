@@ -38,6 +38,16 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [{ "type": "command", "command": "cd $CLAUDE_PROJECT_DIR && npm run lint:atomic 2>&1 | tail -30" }]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [{ "type": "command", "command": "cd $CLAUDE_PROJECT_DIR && npm run lint:atomic 2>&1 | tail -30" }]
+      }
+    ],
     "SessionEnd": [
       {
         "hooks": [

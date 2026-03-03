@@ -6,7 +6,13 @@
   "scripts": {
     "meeting-sync": "node .scripts/meeting-intel/sync-from-granola.cjs",
     "meeting-sync:dry-run": "node .scripts/meeting-intel/sync-from-granola.cjs --dry-run",
-    "meeting-sync:force": "node .scripts/meeting-intel/sync-from-granola.cjs --force"
+    "meeting-sync:force": "node .scripts/meeting-intel/sync-from-granola.cjs --force",
+    "lint:js": "npx eslint .scripts/ .claude/hooks/ --ext .cjs,.js",
+    "lint:py": "python3 -m ruff check core/ .scripts/ --select E,W,F",
+    "lint:atomic": "npm run lint:js; npm run lint:py"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

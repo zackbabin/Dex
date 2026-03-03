@@ -76,6 +76,13 @@ Add any personal instructions between these markers. The `/dex-update` process p
 
 ## USER_EXTENSIONS_END
 
+## Linting & Quality Standards
+
+- **Python (core/)**: Ruff enforced (`E`, `W`, `F`, `I` rules).
+- **CJS Scripts (.scripts/)**: ESLint enforced. Never use `var`; always use `const` or `let`.
+- **Atomic Rule**: PostToolUse hooks run `npm run lint:atomic` after every file edit.
+- **Error Handling**: If the lint hook fails, fix all linting errors immediately before proceeding.
+
 ---
 
 ## Core Behaviors

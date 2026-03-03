@@ -210,7 +210,7 @@ FROM creator_subscriptions_by_price ORDER BY synced_at DESC LIMIT 1;
 **First Copy Conversion** → output key: `first_copy_conversion`
 ```sql
 SELECT stats_data FROM summary_stats ORDER BY calculated_at DESC LIMIT 1;
--- Extract: copy_rate → key_metric
+-- Extract: copyRate (camelCase in JSON) → key_metric, formatted as "X.X%"
 
 SELECT path_type, analysis_type, path_rank, sequence,
        converter_count, pct_of_converters, total_converters_analyzed
