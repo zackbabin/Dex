@@ -266,7 +266,7 @@ Load via `ToolSearch` query "alphavantage". Run **3 calls** (sequential — 1 re
 5. **Volatility & sentiment** — VIX moves, fear/greed shifts, unusual volume
 
 Each insight must have:
-- `rank` (1-5), `headline` (max 80 chars), `body` (1-2 sentences written for a retail investor — plain language, no jargon)
+- `rank` (1-5), `headline` (max 80 chars), `body` (1-2 sentences, up to 300 characters, written for a retail investor — plain language, no jargon)
 - `sentiment` ("bullish"/"bearish"/"neutral"), `pillar` (optional), `data_point`
 
 Skip anything that only matters to institutional traders. Focus on "what moved, why, and what it means for my portfolio."
