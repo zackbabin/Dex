@@ -34,7 +34,7 @@ LEADERSHIP_IDS:
 
 # Pillar mapping — explicit overrides take priority, then keyword inference
 # IMPORTANT: Override check order matters. More specific overrides (ltv_cac, first_copy_conversion)
-# are checked BEFORE the broad "Premium" catch-all in premium_creator_revenue.
+# are checked BEFORE the broad catch-alls.
 PILLAR_OVERRIDES:
   ltv_cac:
     - "Plus Subscription"
@@ -52,13 +52,15 @@ PILLAR_OVERRIDES:
     - "Rebalance"
     - "Net Performance"
     - "Advanced Metrics"
-  premium_creator_revenue:
+  aum_retention:
     - "Premium"                                # broad catch-all — checked LAST
+    - "Rebalance"
+    - "Portfolio Performance"
 
 PILLAR_KEYWORDS:
-  premium_creator_revenue: [premium, creator revenue, creator earnings, creator payout]
-  first_copy_conversion: [copy, activation, onboarding, experiment, funnel, conversion, pdp, discovery, rebalance, portfolio, performance, metrics, trade]
-  ltv_cac: [subscription, lifecycle, retention, churn, ltv, braze, attribution, appsflyer, deposit, bank, plaid, analytics, segment, tracking, revenue]
+  aum_retention: [aum, retention, investment, rebalance, portfolio performance, total investments, invested more, copied portfolio]
+  first_copy_conversion: [copy, activation, onboarding, experiment, funnel, conversion, pdp, discovery, portfolio, performance, metrics, trade]
+  ltv_cac: [subscription, lifecycle, churn, ltv, braze, attribution, appsflyer, deposit, bank, plaid, analytics, segment, tracking, revenue]
 ```
 
 ---
@@ -174,37 +176,32 @@ Each pillar writes to its key (`premium_creator_revenue`, `first_copy_conversion
 
 Read from already-synced tables to build pillar metrics:
 
-**Premium Creator Revenue** → output key: `premium_creator_revenue`
+**AUM Retention** → output key: `aum_retention`
 ```sql
--- Primary metric: Average revenue per premium creator (latest sync)
--- NOTE: total_revenue is stored in dollars (not cents)
-SELECT AVG(total_revenue) as avg_revenue, COUNT(*) as creator_count, SUM(total_revenue) as total_revenue
-FROM premium_creator_metrics
-WHERE synced_at = (SELECT MAX(synced_at) FROM premium_creator_metrics);
--- → key_metric = avg_revenue (format as "$X,XXX"), metric_label = "Avg Creator Revenue"
--- → include total and creator_count in analysis for context
+-- Primary metric: Average total_investments per user (latest materialized view)
+SELECT AVG(total_investments) as avg_total_investments,
+       COUNT(*) as user_count,
+       AVG(total_copies) as avg_copies,
+       AVG(total_investment_count) as avg_investment_count
+FROM main_analysis
+WHERE is_kyc_approved = 1 AND total_investments > 0;
+-- → key_metric = avg_total_investments (format as "$X,XXX"), metric_label = "Avg Total Investments"
 
--- WoW: Compare latest sync avg revenue to previous sync
-SELECT AVG(total_revenue) as prev_avg_revenue
-FROM premium_creator_metrics
-WHERE synced_at = (
-  SELECT DISTINCT synced_at FROM premium_creator_metrics
-  ORDER BY synced_at DESC OFFSET 1 LIMIT 1
-);
--- Calculate percentage change → wow_change, wow_direction
+-- Input metrics: Growth of "Copied Portfolio" and "Invested More" event amounts
+SELECT event_name,
+       COUNT(*) as event_count,
+       SUM(amount) as total_amount,
+       AVG(amount) as avg_amount
+FROM event_sequences_raw
+WHERE event_name IN ('Copied Portfolio', 'Invested More')
+  AND amount IS NOT NULL
+GROUP BY event_name;
+-- Context for analysis: total $ flowing into copies and additional investments
 
-SELECT stats_data FROM summary_stats ORDER BY calculated_at DESC LIMIT 1;
--- Extract: subscription_rate → secondary_metric, secondary_metric_label = "Subscription Rate"
-
-SELECT total_subscriptions, total_paywall_views, total_stripe_modal_views,
-       paywall_views_delta_pct, copy_starts_delta_pct
-FROM premium_creator_metrics ORDER BY synced_at DESC LIMIT 20;
--- Context for analysis
-
-SELECT creator_username, subscription_price, subscription_interval,
-       total_subscriptions, total_paywall_views
-FROM creator_subscriptions_by_price ORDER BY synced_at DESC LIMIT 1;
--- Context for analysis
+-- WoW: Compare current vs previous sync of main_analysis avg investments
+-- Use summary_stats snapshots for trend comparison
+SELECT stats_data FROM summary_stats ORDER BY calculated_at DESC LIMIT 2;
+-- Compare avgTotalInvestments between latest and previous → wow_change, wow_direction
 ```
 
 **First Copy Conversion** → output key: `first_copy_conversion`
@@ -224,7 +221,7 @@ FROM event_sequence_metrics ORDER BY calculated_at DESC LIMIT 5;
 -- Use for wow_change, wow_direction
 ```
 
-**Maximize LTV** → output key: `ltv_cac`
+**Average Revenue per User** → output key: `ltv_cac`
 ```sql
 SELECT COALESCE(week_26_ltv, week_25_ltv, week_24_ltv, week_23_ltv, week_22_ltv,
        week_21_ltv, week_20_ltv, week_19_ltv, week_18_ltv, week_17_ltv,
@@ -293,12 +290,6 @@ Build `pillar_metrics` JSONB from Supabase data (Step 1b). Each pillar gets a ke
 **JSONB structure:**
 ```json
 {
-  "premium_creator_revenue": {
-    "key_metric": "$9,588", "metric_label": "Avg Creator Revenue",
-    "wow_change": "+12%", "wow_direction": "up",
-    "secondary_metric": "2.1%", "secondary_metric_label": "Subscription Rate",
-    "analysis": "Avg premium creator revenue at $9,588 across 24 creators ($230K total)."
-  },
   "first_copy_conversion": {
     "key_metric": "8.4%", "metric_label": "Copy Rate",
     "wow_change": "-0.2pp", "wow_direction": "down",
@@ -308,14 +299,20 @@ Build `pillar_metrics` JSONB from Supabase data (Step 1b). Each pillar gets a ke
     "key_metric": "$4.13", "metric_label": "Avg LTV",
     "wow_change": "+$0.15", "wow_direction": "up",
     "analysis": "Average LTV at $4.13 across all cohorts."
+  },
+  "aum_retention": {
+    "key_metric": "$2,450", "metric_label": "Avg Total Investments",
+    "wow_change": "+3.2%", "wow_direction": "up",
+    "secondary_metric": "4.1", "secondary_metric_label": "Avg Copies",
+    "analysis": "Avg user has $2,450 invested across 4.1 copies. $1.2M in Copied Portfolio + Invested More events this period."
   }
 }
 ```
 
 **Per-pillar sources:**
-- **Premium Creator Revenue:** AVG(total_revenue) from `premium_creator_metrics` (primary, in dollars not cents), subscription_rate from `summary_stats` (secondary), paywall→modal conversion and price tier distribution for analysis context. Include total revenue and creator count in analysis.
 - **First Copy Conversion:** copy_rate from `summary_stats`, top paths from `conversion_path_analysis`, portfolios viewed from `event_sequence_metrics`
-- **Maximize LTV:** avg_ltv from `ltv_cohort_analysis` (most mature non-null week via COALESCE), recent cohort week_4 trend, ROAS from `appsflyer_summary_metrics`
+- **Average Revenue per User:** avg_ltv from `ltv_cohort_analysis` (most mature non-null week via COALESCE), recent cohort week_4 trend, ROAS from `appsflyer_summary_metrics`
+- **AUM Retention:** AVG(total_investments) from `main_analysis` (primary), total_copies and total_investment_count from `main_analysis` (secondary), SUM(amount) for "Copied Portfolio" and "Invested More" from `event_sequences_raw` (input flow context)
 
 `wow_direction`: `"up"`, `"down"`, or `"flat"`
 
