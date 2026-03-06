@@ -33,10 +33,10 @@ LEADERSHIP_IDS:
   joy: "c8f62a70-3690-458e-bf35-c9bb3615dee2"
 
 # Pillar mapping — explicit overrides take priority, then keyword inference
-# IMPORTANT: Override check order matters. More specific overrides (ltv_cac, first_copy_conversion)
+# IMPORTANT: Override check order matters. More specific overrides (avg_revenue, first_copy_conversion)
 # are checked BEFORE the broad catch-alls.
 PILLAR_OVERRIDES:
-  ltv_cac:
+  avg_revenue:
     - "Plus Subscription"
     - "Subscription Lifecycle Optimization"
     - "Appsflyer integration / attribution"
@@ -60,7 +60,7 @@ PILLAR_OVERRIDES:
 PILLAR_KEYWORDS:
   aum_retention: [aum, retention, investment, rebalance, portfolio performance, total investments, invested more, copied portfolio]
   first_copy_conversion: [copy, activation, onboarding, experiment, funnel, conversion, pdp, discovery, portfolio, performance, metrics, trade]
-  ltv_cac: [subscription, lifecycle, churn, ltv, braze, attribution, appsflyer, deposit, bank, plaid, analytics, segment, tracking, revenue]
+  avg_revenue: [subscription, lifecycle, churn, ltv, braze, attribution, appsflyer, deposit, bank, plaid, analytics, segment, tracking, revenue]
 ```
 
 ---
@@ -165,9 +165,9 @@ ORDER BY table_name, ordinal_position;
 
 **Output format (all 3 pillars must produce this structure for `pillar_metrics` JSONB):**
 
-Each pillar writes to its key (`premium_creator_revenue`, `first_copy_conversion`, `ltv_cac`) with these fields:
+Each pillar writes to its key (`premium_creator_revenue`, `first_copy_conversion`, `avg_revenue`) with these fields:
 - `key_metric` (string) — the main KPI value, formatted (e.g., "$1,234", "$4.13")
-- `metric_label` (string) — what the metric is (e.g., "Total Revenue", "Copy Rate", "Avg LTV")
+- `metric_label` (string) — what the metric is (e.g., "Avg Total Investments", "KYC to first copy", "Freemium users that KYC")
 - `wow_change` (string) — week-over-week change with sign (e.g., "+12%", "-$0.15")
 - `wow_direction` (string) — "up", "down", or "flat"
 - `secondary_metric` (string, optional) — a secondary KPI value (e.g., "2.1%")
@@ -177,16 +177,10 @@ Each pillar writes to its key (`premium_creator_revenue`, `first_copy_conversion
 Read from already-synced tables to build pillar metrics:
 
 **AUM Retention** → output key: `aum_retention`
-```sql
--- Primary metric: Average total_investments per user (latest materialized view)
-SELECT AVG(total_investments) as avg_total_investments,
-       COUNT(*) as user_count,
-       AVG(total_copies) as avg_copies,
-       AVG(total_investment_count) as avg_investment_count
-FROM main_analysis
-WHERE is_kyc_approved = 1 AND total_investments > 0;
--- → key_metric = avg_total_investments (format as "$X,XXX"), metric_label = "Avg Total Investments"
 
+Primary metric comes from `summary_stats.stats_data.avgInvestments` (already fetched in the summary_stats query above). No separate query needed.
+
+```sql
 -- Input metrics: Growth of "Copied Portfolio" and "Invested More" event amounts
 SELECT event_name,
        COUNT(*) as event_count,
@@ -198,16 +192,16 @@ WHERE event_name IN ('Copied Portfolio', 'Invested More')
 GROUP BY event_name;
 -- Context for analysis: total $ flowing into copies and additional investments
 
--- WoW: Compare current vs previous sync of main_analysis avg investments
--- Use summary_stats snapshots for trend comparison
+-- WoW: Compare avgInvestments between latest and previous summary_stats snapshots
 SELECT stats_data FROM summary_stats ORDER BY calculated_at DESC LIMIT 2;
--- Compare avgTotalInvestments between latest and previous → wow_change, wow_direction
+-- Compare stats_data->'avgInvestments' between rows → wow_change, wow_direction
 ```
 
 **First Copy Conversion** → output key: `first_copy_conversion`
 ```sql
 SELECT stats_data FROM summary_stats ORDER BY calculated_at DESC LIMIT 1;
 -- Extract: copyRate (camelCase in JSON) → key_metric, formatted as "X.X%"
+-- metric_label: "KYC to first copy"
 
 SELECT path_type, analysis_type, path_rank, sequence,
        converter_count, pct_of_converters, total_converters_analyzed
@@ -221,20 +215,17 @@ FROM event_sequence_metrics ORDER BY calculated_at DESC LIMIT 5;
 -- Use for wow_change, wow_direction
 ```
 
-**Average Revenue per User** → output key: `ltv_cac`
+**Average Revenue per User** → output key: `avg_revenue`
 ```sql
-SELECT COALESCE(week_26_ltv, week_25_ltv, week_24_ltv, week_23_ltv, week_22_ltv,
-       week_21_ltv, week_20_ltv, week_19_ltv, week_18_ltv, week_17_ltv,
-       week_16_ltv, week_15_ltv, week_14_ltv, week_13_ltv, week_12_ltv,
-       week_11_ltv, week_10_ltv, week_9_ltv, week_8_ltv, week_7_ltv,
-       week_6_ltv, week_5_ltv, week_4_ltv, week_3_ltv, week_2_ltv, week_1_ltv) as avg_ltv
-FROM ltv_cohort_analysis WHERE cohort_label = 'Avg Cohorts';
--- → key_metric (adjust COALESCE columns to match schema)
+SELECT AVG(revenue_per_user) AS avg_revenue_per_user
+FROM public.main_analysis
+WHERE is_freemium = 1 AND kyc_submitted_time IS NOT NULL;
+-- → key_metric, formatted as "$X.XX"
+-- metric_label: "Freemium users that KYC"
 
-SELECT cohort_week, cohort_label, user_count, week_4_ltv
-FROM ltv_cohort_analysis WHERE cohort_label != 'Avg Cohorts'
-ORDER BY cohort_week DESC LIMIT 8;
--- Cohort trends → wow_change, wow_direction, analysis
+-- WoW: Compare arpu between latest and previous summary_stats snapshots
+SELECT stats_data FROM summary_stats ORDER BY calculated_at DESC LIMIT 2;
+-- Compare stats_data->'arpu' between rows → wow_change, wow_direction
 
 SELECT stats_data FROM appsflyer_summary_metrics ORDER BY created_at DESC LIMIT 1;
 -- Acquisition context for analysis (stats_data is JSONB)
@@ -291,12 +282,12 @@ Build `pillar_metrics` JSONB from Supabase data (Step 1b). Each pillar gets a ke
 ```json
 {
   "first_copy_conversion": {
-    "key_metric": "8.4%", "metric_label": "Copy Rate",
+    "key_metric": "8.4%", "metric_label": "KYC to first copy",
     "wow_change": "-0.2pp", "wow_direction": "down",
     "analysis": "Copy rate slightly down."
   },
-  "ltv_cac": {
-    "key_metric": "$4.13", "metric_label": "Avg LTV",
+  "avg_revenue": {
+    "key_metric": "$60.00", "metric_label": "Freemium users that KYC",
     "wow_change": "+$0.15", "wow_direction": "up",
     "analysis": "Average LTV at $4.13 across all cohorts."
   },
@@ -312,7 +303,7 @@ Build `pillar_metrics` JSONB from Supabase data (Step 1b). Each pillar gets a ke
 **Per-pillar sources:**
 - **First Copy Conversion:** copy_rate from `summary_stats`, top paths from `conversion_path_analysis`, portfolios viewed from `event_sequence_metrics`
 - **Average Revenue per User:** avg_ltv from `ltv_cohort_analysis` (most mature non-null week via COALESCE), recent cohort week_4 trend, ROAS from `appsflyer_summary_metrics`
-- **AUM Retention:** AVG(total_investments) from `main_analysis` (primary), total_copies and total_investment_count from `main_analysis` (secondary), SUM(amount) for "Copied Portfolio" and "Invested More" from `event_sequences_raw` (input flow context)
+- **AUM Retention:** `avgInvestments` from `summary_stats` (primary), SUM(amount) for "Copied Portfolio" and "Invested More" from `event_sequences_raw` (input flow context)
 
 `wow_direction`: `"up"`, `"down"`, or `"flat"`
 
